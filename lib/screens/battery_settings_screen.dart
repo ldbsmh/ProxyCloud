@@ -165,7 +165,7 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
     return Scaffold(
       backgroundColor: AppTheme.primaryDark,
       appBar: AppBar(
-        title: Text("Battery Settings"),
+        title: const Text("Battery Settings"),
         backgroundColor: AppTheme.surfaceContainer,
         elevation: 0,
         centerTitle: true,
@@ -174,71 +174,15 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
+
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header Section
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    AppTheme.connectedGreen,
-                    AppTheme.connectedGreen.withValues(alpha: 0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.connectedGreen.withValues(alpha: 0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.connectedGreen.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.battery_charging_full,
-                      size: 56,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    context.tr(TranslationKeys.batterySettingsHeaderTitle),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    context.tr(
-                      TranslationKeys.batterySettingsHeaderDescription,
-                    ),
-                    style: const TextStyle(fontSize: 15, color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
 
             const SizedBox(height: 28),
 
-            // Battery Optimization Section
             _buildSectionCard(
               context,
               title: context.tr(
@@ -257,7 +201,6 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
 
             const SizedBox(height: 20),
 
-            // General Battery Settings Section
             _buildSectionCard(
               context,
               title: context.tr(TranslationKeys.batterySettingsGeneralBattery),
@@ -274,7 +217,6 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
 
             const SizedBox(height: 20),
 
-            // App Settings Section
             _buildSectionCard(
               context,
               title: context.tr(TranslationKeys.batterySettingsAppSettings),
@@ -291,13 +233,12 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
 
             const SizedBox(height: 28),
 
-            // Information Section
+            /// 为什么要禁用电池优化
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                   colors: [
                     Colors.blue.withValues(alpha: 0.2),
                     Colors.blue.withValues(alpha: 0.1),
@@ -306,25 +247,29 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: Colors.blue.withValues(alpha: 0.3),
-                  width: 1,
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.info_outline,
-                      color: Colors.blue,
-                      size: 24,
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.info_outline,
+                        color: Colors.blue,
+                      ),
                     ),
                   ),
+
                   const SizedBox(height: 16),
+
                   Text(
                     context.tr(TranslationKeys.batterySettingsWhyDisable),
                     style: const TextStyle(
@@ -333,7 +278,9 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                       color: Colors.blue,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   Text(
                     context.tr(TranslationKeys.batterySettingsBenefitsList),
                     style: const TextStyle(
@@ -348,13 +295,12 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
 
             const SizedBox(height: 20),
 
-            // Warning Section
+            /// 重要提示
             Container(
+              width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                   colors: [
                     Colors.orange.withValues(alpha: 0.2),
                     Colors.orange.withValues(alpha: 0.1),
@@ -363,25 +309,29 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: Colors.orange.withValues(alpha: 0.3),
-                  width: 1,
                 ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.warning_amber_outlined,
-                      color: Colors.orange,
-                      size: 24,
+
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_outlined,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
+
                   const SizedBox(height: 16),
+
                   Text(
                     context.tr(TranslationKeys.batterySettingsImportantNote),
                     style: const TextStyle(
@@ -390,7 +340,9 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                       color: Colors.orange,
                     ),
                   ),
+
                   const SizedBox(height: 12),
+
                   Text(
                     context.tr(TranslationKeys.batterySettingsDeviceNote),
                     style: const TextStyle(
@@ -422,12 +374,14 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
       elevation: 4,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+
             Row(
               children: [
+
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -437,14 +391,16 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                   child: Icon(
                     icon,
                     color: iconColor ?? AppTheme.primaryBlue,
-                    size: 24,
                   ),
                 ),
+
                 const SizedBox(width: 16),
+
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+
                       Text(
                         title,
                         style: const TextStyle(
@@ -453,49 +409,39 @@ class _BatterySettingsScreenState extends State<BatterySettingsScreen> {
                           color: Colors.white,
                         ),
                       ),
+
                       const SizedBox(height: 4),
+
                       Text(
                         description,
-                        style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[400],
+                        ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
                 onPressed: onPressed,
                 icon: _isLoading
-                    ? SizedBox(
+                    ? const SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(Icons.open_in_new, size: 18),
-                label: Text(
-                  _isLoading
-                      ? context.tr(TranslationKeys.batterySettingsOpening)
-                      : buttonText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                    : const Icon(Icons.open_in_new, size: 18),
+                label: Text(buttonText),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.primaryBlue,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                 ),
               ),
             ),
