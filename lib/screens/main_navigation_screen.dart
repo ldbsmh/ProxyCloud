@@ -18,15 +18,12 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
+
+  // 只保留 VPN (HomeScreen) 和 工具 (ToolsScreen)
   final List<Widget> _screens = [
     const HomeScreen(),
     const ToolsScreen(),
   ];
-
-  @override
-  void initState() {
-    super.initState();
-  }
 
   Future<void> _launchTelegramUrl() async {
     final Uri url = Uri.parse('https://t.me/h3dev');
@@ -125,12 +122,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                   fontWeight: FontWeight.bold,
                 ),
                 items: [
+                  // VPN 页面按钮
                   BottomNavigationBarItem(
                     icon: Container(
                       padding: const EdgeInsets.all(4.0),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _currentIndex == 0
+                            ? AppTheme.primaryBlue.withOpacity(0.2)
+                            : Colors.transparent,
+                      ),
+                      child: const Icon(Icons.vpn_key_rounded),
+                    ),
+                    label: context.tr(TranslationKeys.navVpn),
+                  ),
+                  // 工具页面按钮
+                  BottomNavigationBarItem(
+                    icon: Container(
+                      padding: const EdgeInsets.all(4.0),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _currentIndex == 1
                             ? AppTheme.primaryBlue.withOpacity(0.2)
                             : Colors.transparent,
                       ),
