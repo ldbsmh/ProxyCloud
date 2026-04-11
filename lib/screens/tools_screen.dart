@@ -187,20 +187,6 @@ class _ToolsScreenState extends State<ToolsScreen> {
                 ),
                 _buildToolCard(
                   context,
-                  title: context.tr(TranslationKeys.toolsPerAppTunnel),
-                  description: context.tr('tools.per_app_tunnel_desc'),
-                  icon: Icons.shield_moon,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const PerAppTunnelScreen(),
-                      ),
-                    );
-                  },
-                ),
-                _buildToolCard(
-                  context,
                   title: context.tr(TranslationKeys.toolsHomeWallpaper),
                   description: context.tr('tools.home_wallpaper_desc'),
                   icon: Icons.wallpaper,
