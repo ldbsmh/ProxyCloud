@@ -580,8 +580,6 @@
         "vpn_takeover_sub": "Off = local proxy mode only",
         "per_app": "Per-app proxy",
         "per_app_sub": "Route selected apps through the tunnel",
-        "mode_allow": "Only selected apps use proxy",
-        "mode_deny": "Selected apps bypass proxy",
         "select_apps": "Select Apps",
         "settings_server": "Server Settings",
         "settings_doh": "DoH & Public Key",

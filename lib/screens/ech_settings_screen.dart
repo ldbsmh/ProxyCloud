@@ -103,18 +103,6 @@ class EchSettingsScreen extends StatelessWidget {
                   onChanged: ech.setPerAppEnabled,
                 ),
                 if (ech.perAppEnabled) ...[
-                  _ModeRadio(
-                    label: t.tr('ech.mode_allow'),
-                    value: ech.perAppMode,
-                    selected: ech.perAppMode,
-                    onChanged: ech.setPerAppMode,
-                  ),
-                  _ModeRadio(
-                    label: t.tr('ech.mode_deny'),
-                    value: !ech.perAppMode,
-                    selected: !ech.perAppMode,
-                    onChanged: (v) => ech.setPerAppMode(!v),
-                  ),
                   const SizedBox(height: 4),
                   OutlinedButton.icon(
                     onPressed: () {
@@ -254,32 +242,6 @@ class _DropdownRow extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ModeRadio extends StatelessWidget {
-  final String label;
-  final bool value;
-  final bool selected;
-  final ValueChanged<bool> onChanged;
-  const _ModeRadio({
-    required this.label,
-    required this.value,
-    required this.selected,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RadioListTile<bool>(
-      title: Text(label),
-      value: value,
-      groupValue: selected,
-      dense: true,
-      onChanged: (v) {
-        if (v != null) onChanged(v);
-      },
     );
   }
 }

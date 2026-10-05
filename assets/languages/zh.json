@@ -584,8 +584,6 @@
     "vpn_takeover_sub": "关闭后仅本地代理模式（不接管全部流量）",
     "per_app": "分应用代理",
     "per_app_sub": "仅对选中应用生效",
-    "mode_allow": "仅允许选中应用走代理",
-    "mode_deny": "选中应用不走代理",
     "select_apps": "选择应用"
   }
 }

@@ -92,7 +92,7 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider.value(value: widget.languageProvider),
         ChangeNotifierProvider(create: (context) => V2RayProvider()),
-        ChangeNotifierProvider(create: (context) => EchProvider()),
+        ChangeNotifierProvider(create: (context) => EchProvider()..initialize()),
         ChangeNotifierProvider(create: (context) => TelegramProxyProvider()),
         ChangeNotifierProvider(
           create: (context) {

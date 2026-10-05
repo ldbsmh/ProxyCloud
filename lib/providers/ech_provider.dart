@@ -112,10 +112,7 @@ class EchProvider extends ChangeNotifier {
   String get pubkeyDomain => _settings.pubKeyDomain;
   bool get vpnTakeover => _settings.vpnGlobal;
   bool get perAppEnabled => _settings.perAppProxy;
-  bool get perAppMode => _settings.perAppMode == 'allow';
-  List<String> get selectedApps => _settings.perAppMode == 'allow'
-      ? _settings.allowedApps
-      : _settings.excludedApps;
+  List<String> get selectedApps => _settings.allowedApps;
 
   void setDohServer(String v) {
     _settings = _settings.copyWith(dohServer: v);
@@ -134,11 +131,6 @@ class EchProvider extends ChangeNotifier {
 
   void setPerAppEnabled(bool v) {
     _settings = _settings.copyWith(perAppProxy: v);
-    _persistSettings();
-  }
-
-  void setPerAppMode(bool v) {
-    _settings = _settings.copyWith(perAppMode: v ? 'allow' : 'exclude');
     _persistSettings();
   }
 
