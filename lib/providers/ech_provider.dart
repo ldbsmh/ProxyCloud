@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/ech_config.dart';
+import '../models/v2ray_config.dart';
 import '../services/v2ray_service.dart';
 
 /// Manages ech tunnel state: node list, selection, settings, connection lifecycle.
@@ -18,6 +19,7 @@ class EchProvider extends ChangeNotifier {
   // connection state
   bool _connecting = false;
   bool _connected = false;
+  bool _initializing = true;
   String _statusText = '';
   Timer? _statusTimer;
 
@@ -26,6 +28,7 @@ class EchProvider extends ChangeNotifier {
   EchSettings get settings => _settings;
   bool get connecting => _connecting;
   bool get connected => _connected;
+  bool get initializing => _initializing;
   String get statusText => _statusText;
 
   /// Load persisted nodes/settings. Call once at app start.
@@ -45,6 +48,7 @@ class EchProvider extends ChangeNotifier {
     }
     _connected = await _v2rayService.isActuallyConnected();
     _statusText = _connected ? 'connected' : 'disconnected';
+    _initializing = false;
     notifyListeners();
   }
 

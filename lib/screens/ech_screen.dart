@@ -30,7 +30,7 @@ class EchScreen extends StatelessWidget {
             tooltip: t.tr('ech.settings'),
             onPressed: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const EchSettingsScreen()),
+                MaterialPageRoute(builder: (_) => EchSettingsScreen()),
               );
             },
           ),
@@ -159,13 +159,13 @@ class EchScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.connectedGreen.withValues(alpha: 0.15),
+                      color: AppTheme.connectedGreen.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       t.tr('ech.in_use'),
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppColors.connectedGreen,
+                        color: AppTheme.connectedGreen,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -209,7 +209,7 @@ class EchScreen extends StatelessWidget {
                 ? t.tr('ech.select_hint')
                 : t.tr('home.disconnected');
     final statusColor = connected
-        ? AppColors.connectedGreen
+        ? AppTheme.connectedGreen
         : connecting
             ? theme.colorScheme.primary
             : theme.colorScheme.onSurfaceVariant;
@@ -254,7 +254,7 @@ class EchScreen extends StatelessWidget {
                 child: connected
                     ? FilledButton.icon(
                         style: FilledButton.styleFrom(
-                          backgroundColor: AppColors.disconnectedRed,
+                          backgroundColor: AppTheme.disconnectedRed,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                         ),
@@ -316,7 +316,7 @@ class EchScreen extends StatelessWidget {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: AppColors.disconnectedRed,
+              backgroundColor: AppTheme.disconnectedRed,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(t.tr('ech.delete')),
@@ -440,7 +440,7 @@ class _AddNodeDialogState extends State<_AddNodeDialog> {
               Padding(
                 padding: const EdgeInsets.only(top: 10),
                 child: Text(_error!,
-                    style: TextStyle(color: AppColors.disconnectedRed)),
+                    style: TextStyle(color: AppTheme.disconnectedRed)),
               ),
           ],
         ),
