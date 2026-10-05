@@ -45,6 +45,14 @@ public class WsProxyVpnService extends VpnService {
     private static final String TAG = "WsProxyVpnService";
     private static final int NOTIFICATION_ID = 1;
 
+    /** Latest running instance, for native probes that need socket protection. */
+    private static volatile WsProxyVpnService sInstance;
+
+    /** Returns the currently running service instance, or null. */
+    public static WsProxyVpnService getInstance() {
+        return sInstance;
+    }
+
     private ParcelFileDescriptor mInterface;
     private Process tunProcess;
     private WsSocks5Server socksServer;
@@ -65,6 +73,7 @@ public class WsProxyVpnService extends VpnService {
     @Override
     public void onCreate() {
         super.onCreate();
+        sInstance = this;
         isRunning = false;
         tunProcess = null;
         mInterface = null;
@@ -424,6 +433,7 @@ public class WsProxyVpnService extends VpnService {
         if (isRunning) {
             stopAll();
         }
+        sInstance = null;
         super.onDestroy();
     }
 

@@ -21,6 +21,7 @@ class EchProvider extends ChangeNotifier {
   bool _connected = false;
   bool _initializing = true;
   String _statusText = '';
+  String? _lastError;
   Timer? _statusTimer;
 
   List<EchNode> get nodes => List.unmodifiable(_nodes);
@@ -30,6 +31,7 @@ class EchProvider extends ChangeNotifier {
   bool get connected => _connected;
   bool get initializing => _initializing;
   String get statusText => _statusText;
+  String? get lastError => _lastError;
 
   /// Load persisted nodes/settings. Call once at app start.
   Future<void> initialize() async {
@@ -173,6 +175,7 @@ class EchProvider extends ChangeNotifier {
     _connecting = false;
     _connected = ok;
     _statusText = ok ? 'connected' : 'failed';
+    _lastError = ok ? null : _v2rayService.lastConnectError;
     notifyListeners();
     return ok;
   }
@@ -181,6 +184,7 @@ class EchProvider extends ChangeNotifier {
     await _v2rayService.disconnect();
     _connected = false;
     _statusText = 'disconnected';
+    _lastError = null;
     notifyListeners();
   }
 

@@ -248,6 +248,19 @@ class EchScreen extends StatelessWidget {
               Text(statusText, style: theme.textTheme.bodyMedium),
             ],
           ),
+          if (!connected && ech.lastError != null) ...[
+            const SizedBox(height: 6),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                ech.lastError!,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppTheme.disconnectedRed,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

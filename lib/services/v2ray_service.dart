@@ -154,6 +154,16 @@ class V2RayService extends ChangeNotifier {
 
   late final V2ray _flutterV2ray;
 
+  // Active ech tunnel endpoint (set during connect for ech configs) — used by
+  // the through-tunnel verification probes.
+  String? _activeEchWsUrl;
+  String? _activeEchToken;
+
+  // Human-readable reason for the last failed connect() — shown by ech UI so
+  // users can tell whether the Worker probe or the through-tunnel probe failed.
+  String? _lastConnectError;
+  String? get lastConnectError => _lastConnectError;
+
   // Current V2Ray status from the callback
   V2RayStatus? _currentStatus;
   V2RayStatus? get currentStatus => _currentStatus;
@@ -219,6 +229,7 @@ class V2RayService extends ChangeNotifier {
   }
 
   Future<bool> connect(V2RayConfig config, bool statusProxy) async {
+    _lastConnectError = null;
     try {
       await initialize();
 
@@ -228,6 +239,7 @@ class V2RayService extends ChangeNotifier {
       // Request permission if needed (for VPN mode)
       bool hasPermission = await _flutterV2ray.requestPermission();
       if (!hasPermission) {
+        _lastConnectError = 'VPN 权限未授予';
         debugPrint('VPN permission not granted');
         return false;
       }
@@ -295,9 +307,12 @@ class V2RayService extends ChangeNotifier {
         // compatibility-date broken — don't even bother starting the VPN.
         final wsOk = await _verifyEchWs(parser);
         if (!wsOk) {
+          _lastConnectError = 'Worker 预检失败：无法通过 WebSocket 连通隧道（检查服务地址/TOKEN/Worker 兼容日期）';
           debugPrint('ech pre-flight WS probe failed, aborting connect');
           return false;
         }
+        _activeEchWsUrl = parser.wsUrl;
+        _activeEchToken = parser.token;
         await _flutterV2ray.startEchProxy(
           remark: parser.remark,
           config: parser.getFullEchConfig(),
@@ -335,6 +350,7 @@ class V2RayService extends ChangeNotifier {
       if (parser is ECHURL) {
         final echVerified = await _verifyEchHttp();
         if (!echVerified) {
+          _lastConnectError = '隧道数据验证失败：generate_204 探测未通过（Worker 兼容日期或优选 IP 问题）';
           debugPrint('ech tunnel data verification failed after connection');
           try {
             await disconnect();
@@ -346,6 +362,7 @@ class V2RayService extends ChangeNotifier {
       } else {
         final connectionVerified = await isActuallyConnected();
         if (!connectionVerified) {
+          _lastConnectError = '连接验证失败（v2ray 内核未就绪）';
           debugPrint(
             'Connection verification failed immediately after connection',
           );
@@ -374,6 +391,7 @@ class V2RayService extends ChangeNotifier {
 
       return true;
     } catch (e) {
+      _lastConnectError = '连接异常：$e';
       debugPrint('Error connecting to V2Ray: $e');
       // Try to disconnect to clean up any partial connection
       try {
@@ -415,22 +433,40 @@ class V2RayService extends ChangeNotifier {
   /// HTTP generate_204 probes THROUGH the established tunnel. Returns true as
   /// soon as any endpoint answers 2xx — proves the tunnel can actually carry
   /// data end-to-end.
+  /// HTTP generate_204 probes THROUGH the established tunnel. Returns true as
+  /// soon as any endpoint answers 2xx — proves the tunnel can actually carry
+  /// data end-to-end.
+  ///
+  /// IMPORTANT: the probe must resolve the hostname on the WORKER side, not on
+  /// this device. This engine's SOCKS5 server only supports TCP CONNECT, so
+  /// UDP DNS through the tunnel fails — a client-side DNS lookup (e.g. via
+  /// package:http) would never resolve and the probe would always fail. The
+  /// native probe opens a WS, CONNECTs to host:port (resolved by the Worker)
+  /// and sends a plain HTTP GET /generate_204.
   Future<bool> _verifyEchHttp() async {
+    final wsUrl = _activeEchWsUrl;
+    if (wsUrl == null) {
+      debugPrint('ech 204 probe: no active ech wsUrl');
+      return false;
+    }
     const endpoints = [
-      'https://www.gstatic.com/generate_204',
-      'https://cp.cloudflare.com/generate_204',
+      ('cp.cloudflare.com', 80),
+      ('www.gstatic.com', 80),
     ];
-    for (final url in endpoints) {
+    for (final (host, port) in endpoints) {
       try {
-        final resp = await http
-            .get(Uri.parse(url))
-            .timeout(const Duration(seconds: 10));
-        debugPrint('ech 204 probe $url -> ${resp.statusCode}');
-        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        final probe = await _flutterV2ray.echHttpProbe(
+          wsUrl: wsUrl,
+          token: _activeEchToken,
+          host: host,
+          port: port,
+        );
+        debugPrint('ech 204 probe $host:$port -> $probe');
+        if (probe['ok'] == true) {
           return true;
         }
       } catch (e) {
-        debugPrint('ech 204 probe $url failed: $e');
+        debugPrint('ech 204 probe $host:$port threw: $e');
       }
     }
     return false;
@@ -455,6 +491,8 @@ class V2RayService extends ChangeNotifier {
 
       // Clear active config and last connection time
       _activeConfig = null;
+      _activeEchWsUrl = null;
+      _activeEchToken = null;
       _lastConnectionTime = null;
 
       // Clear active config from storage but keep the usage statistics

@@ -97,6 +97,27 @@ class MethodChannelFlutterV2ray extends FlutterV2rayPlatform {
     return {'ok': false, 'ws': false, 'error': 'Unexpected native response'};
   }
 
+  /// HTTP generate_204 probe THROUGH the ech tunnel. The hostname is resolved
+  /// by the Worker (server-side), so this works even when client-side UDP DNS
+  /// through the tunnel is broken. Returns a map with `ok` and `error`.
+  Future<Map<String, dynamic>> echHttpProbe({
+    required String wsUrl,
+    String? token,
+    required String host,
+    int port = 80,
+  }) async {
+    final res = await methodChannel.invokeMethod('echHttpProbe', {
+      'ws_url': wsUrl,
+      'token': token ?? '',
+      'host': host,
+      'port': port,
+    });
+    if (res is Map) {
+      return Map<String, dynamic>.from(res);
+    }
+    return {'ok': false, 'error': 'Unexpected native response'};
+  }
+
   @override
   Future<void> stopV2Ray() async {
     await methodChannel.invokeMethod('stopV2Ray');

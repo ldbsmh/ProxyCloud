@@ -512,6 +512,112 @@ public class WsTunnelClient extends WebSocketListener {
         }
     }
 
+    /**
+     * Static HTTP reachability probe THROUGH the tunnel (no VpnService needed).
+     *
+     * <p>Opens a WebSocket to the Worker, CONNECTs to {@code host:port} and
+     * sends a plain HTTP {@code GET /generate_204}. The hostname is resolved by
+     * the WORKER (server-side {@code connect()}), so this probe works even when
+     * the client's own DNS path (UDP through the tunnel) is broken — which is
+     * exactly the case for this engine (WsSocks5Server only supports TCP
+     * CONNECT, so tunneled UDP DNS fails).
+     *
+     * <p>Returns {@code true} when the tunnel can carry real HTTP traffic
+     * end-to-end (any 2xx in the status line).
+     */
+    public static boolean httpProbeThroughTunnel(String wsUrl, String token,
+                                                 String host, int port, long timeoutMs) {
+        return httpProbeThroughTunnel(wsUrl, token, host, port, timeoutMs, null);
+    }
+
+    /**
+     * Variant that accepts a VpnService to protect the probe WebSocket socket.
+     * Must be used when the probe runs AFTER the VPN is established — without
+     * protection the probe socket's traffic would enter the tunnel itself and
+     * loop forever.
+     */
+    public static boolean httpProbeThroughTunnel(String wsUrl, String token,
+                                                 String host, int port, long timeoutMs,
+                                                 VpnService vpnService) {
+        final OkHttpClient.Builder b = new OkHttpClient.Builder()
+                .connectTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(false);
+        if (vpnService != null) {
+            b.socketFactory(new ProtectedSocketFactory(vpnService));
+        }
+        final OkHttpClient client = b.build();
+        final Request.Builder rb = new Request.Builder().url(wsUrl);
+        if (token != null && !token.isEmpty()) {
+            rb.header("Sec-WebSocket-Protocol", token);
+        }
+        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        final AtomicBoolean verdict = new AtomicBoolean(false);
+        final StringBuilder response = new StringBuilder();
+        final String[] target = {host, String.valueOf(port)};
+        WebSocket probeWs = null;
+        try {
+            probeWs = client.newWebSocket(rb.build(), new WebSocketListener() {
+                @Override
+                public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
+                    webSocket.send(PREFIX_CONNECT + target[0] + ":" + target[1] + "|");
+                }
+
+                @Override
+                public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
+                    if (text.equals(REPLY_CONNECTED)) {
+                        // Tunnel to the target is up: send the HTTP probe request.
+                        String req = "GET /generate_204 HTTP/1.1\r\n"
+                                + "Host: " + target[0] + "\r\n"
+                                + "User-Agent: ProxyCloud-ech-probe\r\n"
+                                + "Connection: close\r\n\r\n";
+                        webSocket.send(req);
+                    } else if (text.startsWith(PREFIX_ERROR)) {
+                        latch.countDown();
+                    }
+                }
+
+                @Override
+                public void onMessage(@NonNull WebSocket webSocket, @NonNull okio.ByteString bytes) {
+                    response.append(bytes.utf8());
+                    String s = response.toString();
+                    // Status line looks like "HTTP/1.1 204 No Content" (or 200/3xx).
+                    // Match the code at a word boundary so " 20" doesn't false-positive.
+                    if (s.matches("(?s).*\\s(204|200|201|202|203|206)\\s.*") || s.contains(" 204 ") || s.contains(" 200 ")) {
+                        verdict.set(true);
+                        latch.countDown();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
+                    latch.countDown();
+                }
+
+                @Override
+                public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
+                    latch.countDown();
+                }
+            });
+            return latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) && verdict.get();
+        } catch (Exception e) {
+            Log.w(TAG, "httpProbeThroughTunnel failed: " + e.getMessage());
+            return false;
+        } finally {
+            // Best-effort cleanup: cancel the probe WS (single-use) and shut
+            // down this probe-only client's dispatcher.
+            try {
+                if (probeWs != null) probeWs.cancel();
+            } catch (Exception ignored) {
+            }
+            try {
+                client.dispatcher().executorService().shutdown();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     /** Two-phase CONNECT handshake latch (wait for onOpen, then CONNECTED). */
     private static class ConnectWaiter {
         private final Object lock = new Object();
