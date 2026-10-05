@@ -243,7 +243,7 @@ public class WsProxyVpnService extends VpnService {
             ProcessBuilder pb = new ProcessBuilder(cmd);
             pb.redirectErrorStream(true);
             kernelProcess = pb.start();
-            Log.d(TAG, "Go kernel started (pid=" + kernelProcess.pid() + "): " + hostPort
+            Log.d(TAG, "Go kernel started: " + hostPort
                     + (preferredIp != null ? " ip=" + preferredIp : ""));
             // Consume kernel logs so the pipe doesn't fill up
             Thread logThread = new Thread(() -> {
