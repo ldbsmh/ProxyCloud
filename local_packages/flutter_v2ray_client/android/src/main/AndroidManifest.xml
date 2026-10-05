@@ -13,6 +13,21 @@
 
     <application>
         <service
+            android:name="dev.amirzr.flutter_v2ray_client.v2ray.services.WsProxyVpnService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:process=":RunSoLibV2RayDaemon">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="vpn" />
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name="dev.amirzr.flutter_v2ray_client.v2ray.services.V2rayProxyOnlyService"
             android:exported="false"
             android:process=":RunSoLibV2RayDaemon" />

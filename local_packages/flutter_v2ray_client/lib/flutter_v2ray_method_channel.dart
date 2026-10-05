@@ -59,6 +59,27 @@ class MethodChannelFlutterV2ray extends FlutterV2rayPlatform {
     });
   }
 
+  /// Starts the Cloudflare Worker WebSocket tunnel engine (ech.txt protocol).
+  /// [config] is the JSON blob from [ECHURL.getFullEchConfig].
+  Future<void> startEchProxy({
+    required String remark,
+    required String config,
+    List<String>? blockedApps,
+    List<String>? bypassSubnets,
+  }) async {
+    await methodChannel.invokeMethod('startEchProxy', {
+      'remark': remark,
+      'config': config,
+      'blocked_apps': blockedApps,
+      'bypass_subnets': bypassSubnets,
+    });
+  }
+
+  /// Stops the WebSocket tunnel engine.
+  Future<void> stopEchProxy() async {
+    await methodChannel.invokeMethod('stopEchProxy');
+  }
+
   @override
   Future<void> stopV2Ray() async {
     await methodChannel.invokeMethod('stopV2Ray');

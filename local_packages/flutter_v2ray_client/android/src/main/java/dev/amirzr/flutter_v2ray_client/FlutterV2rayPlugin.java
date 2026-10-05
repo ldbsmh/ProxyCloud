@@ -175,6 +175,46 @@ public class FlutterV2rayPlugin implements FlutterPlugin, MethodCallHandler, Act
                         result.error("STOP_ERROR", e.getMessage(), null);
                     }
                     break;
+                case "startEchProxy": {
+                    try {
+                        Context ctx = activity != null ? activity : appContext;
+                        String config = call.argument("config");
+                        org.json.JSONObject cfg = new org.json.JSONObject(config);
+                        String wsUrl = cfg.optString("wsUrl");
+                        if (wsUrl.isEmpty()) {
+                            result.error("START_ERROR", "Missing wsUrl in ech config", null);
+                            break;
+                        }
+                        Intent intent = new Intent(ctx, dev.amirzr.flutter_v2ray_client.v2ray.services.WsProxyVpnService.class);
+                        intent.putExtra("COMMAND", "START_SERVICE");
+                        intent.putExtra("WS_URL", wsUrl);
+                        intent.putExtra("WS_TOKEN", cfg.optString("token"));
+                        intent.putExtra("REMARK", call.argument("remark"));
+                        intent.putStringArrayListExtra("BLOCKED_APPS", call.argument("blocked_apps"));
+                        intent.putStringArrayListExtra("BYPASS_SUBNETS", call.argument("bypass_subnets"));
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            ctx.startForegroundService(intent);
+                        } else {
+                            ctx.startService(intent);
+                        }
+                        result.success(null);
+                    } catch (Exception e) {
+                        result.error("START_ERROR", e.getMessage(), null);
+                    }
+                    break;
+                }
+                case "stopEchProxy": {
+                    try {
+                        Context ctx = activity != null ? activity : appContext;
+                        Intent intent = new Intent(ctx, dev.amirzr.flutter_v2ray_client.v2ray.services.WsProxyVpnService.class);
+                        intent.putExtra("COMMAND", "STOP_SERVICE");
+                        ctx.startService(intent);
+                        result.success(null);
+                    } catch (Exception e) {
+                        result.error("STOP_ERROR", e.getMessage(), null);
+                    }
+                    break;
+                }
                 case "getServerDelay":
                     try {
                         result.success(V2rayController.getV2rayServerDelay(call.argument("config"), call.argument("url")));

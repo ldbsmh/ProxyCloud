@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter_v2ray_client/flutter_v2ray.dart';
+import 'package:flutter_v2ray_client/url/ech.dart' show ECHURL;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:proxycloud/models/v2ray_config.dart';
@@ -281,15 +282,28 @@ class V2RayService extends ChangeNotifier {
       // Add a small delay before starting connection to ensure clean state
       await Future.delayed(const Duration(milliseconds: 300));
 
-      // Start V2Ray in VPN mode
-      await _flutterV2ray.startV2Ray(
-        remark: parser.remark,
-        config: parser.getFullConfiguration(),
-        blockedApps: blockedAppsList, // Use saved blocked apps list
-        bypassSubnets: bypassSubnets,
-        proxyOnly: statusProxy, // Use proxy mode based on statusProxy parameter
-        notificationDisconnectButtonName: "DISCONNECT",
-      );
+      // Start the proxy service.
+      // For ech (Cloudflare Worker WebSocket tunnel) configs, the parser is an
+      // ECHURL whose engine config is a small JSON blob consumed by the native
+      // WsProxyVpnService (which bypasses the v2ray core entirely).
+      // For everything else, use the full v2ray JSON through the v2ray core.
+      if (parser is ECHURL) {
+        await _flutterV2ray.startEchProxy(
+          remark: parser.remark,
+          config: parser.getFullEchConfig(),
+          blockedApps: blockedAppsList,
+          bypassSubnets: bypassSubnets,
+        );
+      } else {
+        await _flutterV2ray.startV2Ray(
+          remark: parser.remark,
+          config: parser.getFullConfiguration(),
+          blockedApps: blockedAppsList, // Use saved blocked apps list
+          bypassSubnets: bypassSubnets,
+          proxyOnly: statusProxy, // Use proxy mode based on statusProxy parameter
+          notificationDisconnectButtonName: "DISCONNECT",
+        );
+      }
 
       _activeConfig = config;
       _lastConnectionTime = DateTime.now();
@@ -352,7 +366,14 @@ class V2RayService extends ChangeNotifier {
       // Save current usage statistics before clearing active config
       await _saveUsageStats();
 
-      await _flutterV2ray.stopV2Ray();
+      // Stop the correct engine. ech configs run the WebSocket tunnel engine,
+      // everything else runs the v2ray core.
+      final activeConfig = _activeConfig;
+      if (activeConfig != null && activeConfig.configType == 'ech') {
+        await _flutterV2ray.stopEchProxy();
+      } else {
+        await _flutterV2ray.stopV2Ray();
+      }
 
       // Clear active config and last connection time
       _activeConfig = null;
@@ -634,7 +655,10 @@ class V2RayService extends ChangeNotifier {
           if (line.startsWith('vmess://') ||
               line.startsWith('vless://') ||
               line.startsWith('trojan://') ||
-              line.startsWith('ss://')) {
+              line.startsWith('ss://') ||
+              line.toLowerCase().startsWith('ech://') ||
+              line.toLowerCase().startsWith('ws://') ||
+              line.toLowerCase().startsWith('wss://')) {
             V2RayURL parser = V2ray.parseFromURL(line);
             String configType = '';
 
@@ -646,6 +670,8 @@ class V2RayService extends ChangeNotifier {
               configType = 'shadowsocks';
             } else if (line.startsWith('trojan://')) {
               configType = 'trojan';
+            } else {
+              configType = 'ech';
             }
 
             // Use the parsed address and port from the V2RayURL parser
@@ -733,7 +759,10 @@ class V2RayService extends ChangeNotifier {
           if (line.startsWith('vmess://') ||
               line.startsWith('vless://') ||
               line.startsWith('trojan://') ||
-              line.startsWith('ss://')) {
+              line.startsWith('ss://') ||
+              line.toLowerCase().startsWith('ech://') ||
+              line.toLowerCase().startsWith('ws://') ||
+              line.toLowerCase().startsWith('wss://')) {
             V2RayURL parser = V2ray.parseFromURL(line);
             String configType = '';
 
@@ -745,6 +774,8 @@ class V2RayService extends ChangeNotifier {
               configType = 'shadowsocks';
             } else if (line.startsWith('trojan://')) {
               configType = 'trojan';
+            } else {
+              configType = 'ech';
             }
 
             // Use the parsed address and port from the V2RayURL parser
@@ -1224,6 +1255,10 @@ class V2RayService extends ChangeNotifier {
         configType = 'shadowsocks';
       } else if (configText.startsWith('trojan://')) {
         configType = 'trojan';
+      } else if (configText.toLowerCase().startsWith('ech://') ||
+          configText.toLowerCase().startsWith('ws://') ||
+          configText.toLowerCase().startsWith('wss://')) {
+        configType = 'ech';
       } else {
         throw Exception('Unsupported protocol');
       }

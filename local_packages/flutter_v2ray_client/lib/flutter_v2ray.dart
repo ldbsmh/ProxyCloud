@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_v2ray_client/url/ech.dart';
 import 'package:flutter_v2ray_client/url/shadowsocks.dart';
 import 'package:flutter_v2ray_client/url/socks.dart';
 import 'package:flutter_v2ray_client/url/trojan.dart';
@@ -85,6 +86,29 @@ class V2ray {
     );
   }
 
+  /// Starts the Cloudflare Worker WebSocket tunnel engine (ech.txt protocol).
+  ///
+  /// [config] must be the JSON blob produced by [ECHURL.getFullEchConfig].
+  /// This bypasses the v2ray core entirely.
+  Future<void> startEchProxy({
+    required String remark,
+    required String config,
+    List<String>? blockedApps,
+    List<String>? bypassSubnets,
+  }) async {
+    await FlutterV2rayPlatform.instance.startEchProxy(
+      remark: remark,
+      config: config,
+      blockedApps: blockedApps,
+      bypassSubnets: bypassSubnets,
+    );
+  }
+
+  /// Stops the WebSocket tunnel engine.
+  Future<void> stopEchProxy() async {
+    await FlutterV2rayPlatform.instance.stopEchProxy();
+  }
+
   /// Stops the V2Ray service.
   /// Returns a [Future] that completes when the service is stopped.
   Future<void> stopV2Ray() async {
@@ -149,6 +173,10 @@ class V2ray {
         return ShadowSocksURL(url: url);
       case 'socks':
         return SocksURL(url: url);
+      case 'ech':
+      case 'ws':
+      case 'wss':
+        return ECHURL(url: url);
       default:
         throw ArgumentError('url is invalid');
     }

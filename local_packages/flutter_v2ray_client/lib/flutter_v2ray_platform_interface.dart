@@ -74,6 +74,24 @@ abstract class FlutterV2rayPlatform extends PlatformInterface {
     throw UnimplementedError('stopV2Ray() has not been implemented.');
   }
 
+  /// Starts the Cloudflare Worker WebSocket tunnel engine (ech.txt protocol).
+  /// [config] is the JSON blob from [ECHURL.getFullEchConfig].
+  /// Returns a [Future] that completes when the connection starts.
+  Future<void> startEchProxy({
+    required String remark,
+    required String config,
+    List<String>? blockedApps,
+    List<String>? bypassSubnets,
+  }) {
+    throw UnimplementedError('startEchProxy() has not been implemented.');
+  }
+
+  /// Stops the WebSocket tunnel engine.
+  /// Returns a [Future] that completes when the connection stops.
+  Future<void> stopEchProxy() {
+    throw UnimplementedError('stopEchProxy() has not been implemented.');
+  }
+
   /// Measures the delay to a V2Ray server using the provided configuration and URL.
   /// [config] is the V2Ray configuration in JSON format.
   /// [url] is the server URL to test.
