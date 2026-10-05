@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
+import dev.amirzr.flutter_v2ray_client.v2ray.core.WsSocks5Server;
 import dev.amirzr.flutter_v2ray_client.v2ray.core.WsTunnelPool;
 import dev.amirzr.flutter_v2ray_client.v2ray.utils.AppConfigs;
 import dev.amirzr.flutter_v2ray_client.v2ray.utils.Utilities;

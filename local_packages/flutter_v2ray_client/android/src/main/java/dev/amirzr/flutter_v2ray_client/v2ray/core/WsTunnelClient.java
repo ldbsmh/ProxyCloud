@@ -497,10 +497,5 @@ public class WsTunnelClient extends WebSocketListener {
         public Socket createSocket(InetAddress address, int port, InetAddress localAddress, int localPort) throws IOException {
             return protect(new Socket(address, port, localAddress, localPort));
         }
-
-        @Override
-        public Socket createSocket(Socket socket, String host, int port, boolean autoClose) throws IOException {
-            return protect(new Socket(socket, host, port, autoClose));
-        }
     }
 }
