@@ -6,6 +6,7 @@ import '../providers/ech_provider.dart';
 import '../theme/app_theme.dart';
 import '../utils/app_localizations.dart';
 import '../widgets/background_gradient.dart';
+import 'ech_settings_screen.dart';
 
 /// Main ech tab: shows node list (IP:port) + connect/disconnect,
 /// mirroring the reference EchOS style. Top-right settings gear opens
