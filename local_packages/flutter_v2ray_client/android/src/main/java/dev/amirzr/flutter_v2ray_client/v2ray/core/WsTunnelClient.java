@@ -56,13 +56,51 @@ public class WsTunnelClient extends WebSocketListener {
 
     private static final long CONNECT_TIMEOUT_MS = 10_000L;
 
+    /**
+     * Shared dispatcher (bounded thread pool) + connection pool across all
+     * tunnel sessions.
+     *
+     * <p>Creating a fresh OkHttpClient per SOCKS5 connection used to spin up a
+     * whole new Dispatcher (cached thread pool) + ConnectionPool each time.
+     * ech opens one WebSocket per connection, so concurrent connections or
+     * failed retries created a new thread each — eventually exhausting the
+     * 256MB heap (OutOfMemoryError in RealCall$AsyncCall.run). Sharing the
+     * dispatcher bounds the thread count process-wide.
+     */
+    private static final okhttp3.Dispatcher SHARED_DISPATCHER =
+            new okhttp3.Dispatcher(java.util.concurrent.Executors.newFixedThreadPool(8, r -> {
+                Thread t = new Thread(r, "ech-okhttp");
+                t.setDaemon(true);
+                return t;
+            }));
+
+    private static final okhttp3.ConnectionPool SHARED_POOL =
+            new okhttp3.ConnectionPool(4, 60, java.util.concurrent.TimeUnit.SECONDS);
+
     private final String wsUrl;
     private final String token;
 
     /** VpnService used to protect the WebSocket socket (bypass the tunnel). */
     private final VpnService vpnService;
 
+    /** Per-session client: own socketFactory (protects via its VpnService)
+     * but shares the process-wide dispatcher + connection pool. */
     private final OkHttpClient httpClient;
+
+    private OkHttpClient buildClient() {
+        OkHttpClient.Builder b = new OkHttpClient.Builder()
+                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(false)
+                .dispatcher(SHARED_DISPATCHER)
+                .connectionPool(SHARED_POOL);
+        if (vpnService != null) {
+            b.socketFactory(new ProtectedSocketFactory(vpnService));
+        }
+        return b.build();
+    }
+
     private volatile WebSocket webSocket;
 
     private final AtomicBoolean closed = new AtomicBoolean(false);
@@ -83,16 +121,7 @@ public class WsTunnelClient extends WebSocketListener {
         this.wsUrl = wsUrl;
         this.token = token == null ? "" : token;
         this.vpnService = vpnService;
-
-        OkHttpClient.Builder b = new OkHttpClient.Builder()
-                .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .retryOnConnectionFailure(false);
-        if (vpnService != null) {
-            b.socketFactory(new ProtectedSocketFactory(vpnService));
-        }
-        this.httpClient = b.build();
+        this.httpClient = buildClient();
     }
 
     public String getWsUrl() {
@@ -172,16 +201,19 @@ public class WsTunnelClient extends WebSocketListener {
             }
         }
         writer.shutdownNow();
-        try {
-            if (webSocket != null) {
-                webSocket.close(1000, null);
+        WebSocket ws = webSocket;
+        webSocket = null;
+        if (ws != null) {
+            try {
+                // cancel() aborts the connection immediately, even mid-handshake,
+                // releasing the dispatcher thread. close() alone waits for a
+                // graceful close that never completes if the WS never opened.
+                ws.cancel();
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {
         }
-        try {
-            httpClient.dispatcher().executorService().shutdown();
-        } catch (Exception ignored) {
-        }
+        // Note: the shared dispatcher/connection pool are intentionally NOT
+        // shut down here — they are process-wide and reused by all sessions.
     }
 
     // ------------------------------------------------------------ WebSocket events
@@ -265,7 +297,6 @@ public class WsTunnelClient extends WebSocketListener {
     @Override
     public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
         Log.w(TAG, "WebSocket failure: " + t.getMessage());
-        boolean wasAlive = !closed.get();
         closed.set(true);
         ConnectWaiter w;
         Session s;
@@ -277,15 +308,11 @@ public class WsTunnelClient extends WebSocketListener {
         }
         if (w != null) w.fail(t);
         if (s != null) s.onTransportDead();
-        if (!wasAlive) {
-            shutdownDispatcher();
-        }
     }
 
     @Override
     public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
         Log.d(TAG, "WebSocket closed: " + code + " " + reason);
-        boolean wasAlive = !closed.get();
         closed.set(true);
         ConnectWaiter w;
         Session s;
@@ -297,16 +324,6 @@ public class WsTunnelClient extends WebSocketListener {
         }
         if (w != null) w.fail(new IOException("WebSocket closed (" + code + ")"));
         if (s != null) s.onTransportDead();
-        if (!wasAlive) {
-            shutdownDispatcher();
-        }
-    }
-
-    private void shutdownDispatcher() {
-        try {
-            httpClient.dispatcher().executorService().shutdown();
-        } catch (Exception ignored) {
-        }
     }
 
     // ------------------------------------------------------------ Session
