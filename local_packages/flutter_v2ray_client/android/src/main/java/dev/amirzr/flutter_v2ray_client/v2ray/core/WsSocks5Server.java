@@ -7,6 +7,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
@@ -29,6 +30,7 @@ public class WsSocks5Server {
     public static final int PORT = 10808;
     private static final int SOCKS5_VERSION = 0x05;
     private static final int CMD_CONNECT = 0x01;
+    private static final int CMD_UDP_ASSOCIATE = 0x03;
     private static final int ATYP_IPV4 = 0x01;
     private static final int ATYP_DOMAIN = 0x03;
     private static final int ATYP_IPV6 = 0x04;
@@ -37,9 +39,12 @@ public class WsSocks5Server {
     private static final int REP_NOT_ALLOWED = 0x02;
     private static final int REP_CMD_NOT_SUPPORTED = 0x07;
     private static final int CONNECT_TIMEOUT_MS = 15_000;
+    private static final int UDP_RELAY_PORT = 10809;
 
     private final WsTunnelPool pool;
     private ServerSocket serverSocket;
+    private DatagramSocket udpSocket;
+    private WsUdpRelay udpRelay;
     private final ExecutorService acceptExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "ech-socks-accept");
         t.setDaemon(true);
@@ -64,6 +69,14 @@ public class WsSocks5Server {
                 serverSocket.setReuseAddress(true);
                 serverSocket.bind(new InetSocketAddress("127.0.0.1", PORT));
                 Log.d(TAG, "SOCKS5 listening on 127.0.0.1:" + PORT);
+                // UDP relay socket (SOCKS5 UDP ASSOCIATE target)
+                try {
+                    udpSocket = new DatagramSocket(new InetSocketAddress("127.0.0.1", UDP_RELAY_PORT));
+                    udpRelay = new WsUdpRelay(pool, udpSocket);
+                    udpRelay.start();
+                } catch (IOException e) {
+                    Log.e(TAG, "Failed to bind UDP relay on " + UDP_RELAY_PORT, e);
+                }
                 while (running.get()) {
                     try {
                         Socket client = serverSocket.accept();
@@ -86,6 +99,11 @@ public class WsSocks5Server {
         try {
             if (serverSocket != null) serverSocket.close();
         } catch (IOException ignored) {
+        }
+        if (udpRelay != null) {
+            udpRelay.stop();
+        } else if (udpSocket != null) {
+            udpSocket.close();
         }
         workerPool.shutdownNow();
         acceptExecutor.shutdownNow();
@@ -121,6 +139,33 @@ public class WsSocks5Server {
             int atyp = in.read();
             if (reqVersion != SOCKS5_VERSION) {
                 sendReply(out, REP_FAILURE, null);
+                closeQuietly(client);
+                return;
+            }
+            if (cmd == CMD_UDP_ASSOCIATE) {
+                // Read (and ignore) the requested address/port (usually 0.0.0.0:0),
+                // reply with our UDP relay address, then keep the TCP control
+                // connection open until the client closes it.
+                try {
+                    skipAddressAndPort(in, atyp);
+                } catch (IOException e) {
+                    sendReply(out, REP_FAILURE, null);
+                    closeQuietly(client);
+                    return;
+                }
+                if (udpSocket == null) {
+                    sendReply(out, REP_CMD_NOT_SUPPORTED, null);
+                    closeQuietly(client);
+                    return;
+                }
+                sendUdpAssociateReply(out);
+                // Block until the client closes the control connection.
+                try {
+                    while (in.read() != -1) {
+                        // drain
+                    }
+                } catch (IOException ignored) {
+                }
                 closeQuietly(client);
                 return;
             }
@@ -178,6 +223,43 @@ public class WsSocks5Server {
             Log.w(TAG, "handleClient error: " + e.getMessage());
             closeQuietly(client);
         }
+    }
+
+    private void sendUdpAssociateReply(OutputStream out) throws IOException {
+        // Reply with BND.ADDR=127.0.0.1 BND.PORT=UDP_RELAY_PORT
+        byte[] reply = new byte[10];
+        reply[0] = SOCKS5_VERSION;
+        reply[1] = REP_SUCCESS;
+        reply[2] = 0x00;
+        reply[3] = ATYP_IPV4;
+        byte[] addr = new byte[]{127, 0, 0, 1};
+        System.arraycopy(addr, 0, reply, 4, 4);
+        reply[8] = (byte) ((UDP_RELAY_PORT >> 8) & 0xFF);
+        reply[9] = (byte) (UDP_RELAY_PORT & 0xFF);
+        out.write(reply);
+        out.flush();
+    }
+
+    private static void skipAddressAndPort(InputStream in, int atyp) throws IOException {
+        switch (atyp) {
+            case ATYP_IPV4:
+                readFully(in, new byte[4]);
+                break;
+            case ATYP_IPV6:
+                readFully(in, new byte[16]);
+                break;
+            case ATYP_DOMAIN: {
+                int len = in.read();
+                if (len <= 0 || len > 255) {
+                    throw new IOException("bad domain length");
+                }
+                readFully(in, new byte[len]);
+                break;
+            }
+            default:
+                throw new IOException("bad atyp " + atyp);
+        }
+        readFully(in, new byte[2]); // port
     }
 
     private void sendReply(OutputStream out, int rep, InetAddress bindAddr) throws IOException {

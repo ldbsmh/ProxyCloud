@@ -60,4 +60,20 @@ public class WsTunnelPool {
     public void close() {
         closed = true;
     }
+
+    public String getWsUrl() {
+        return wsUrl;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public VpnService getVpnService() {
+        return vpnService;
+    }
+
+    public String getPreferredIp() {
+        return preferredIp;
+    }
 }

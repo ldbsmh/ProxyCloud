@@ -193,6 +193,7 @@ public class WsProxyVpnService extends VpnService {
         cmd.add("--sock-path");
         cmd.add("sock_path");
         cmd.add("--enable-udprelay");
+        cmd.add("--socks5-udp");
         cmd.add("--loglevel");
         cmd.add("none");
         try {

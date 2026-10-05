@@ -169,11 +169,32 @@ public class WsTunnelClient extends WebSocketListener {
      */
     public Session connectAndAwait(Socket localSocket, String host, int port)
             throws IOException {
+        return connectAndAwait(host, port, localSocket, null, null);
+    }
+
+    /**
+     * Stream-based variant for non-Socket consumers (UDP relay pipes):
+     * local data pumped from {@code in} to the tunnel; tunnel data written
+     * to {@code out}. Same CONNECT handshake semantics.
+     */
+    public Session connectPipeAndAwait(InputStream in, OutputStream out,
+                                       String host, int port) throws IOException {
+        return connectAndAwait(host, port, null, in, out);
+    }
+
+    private Session connectAndAwait(String host, int port, Socket localSocket,
+                                    InputStream pipeIn, OutputStream pipeOut)
+            throws IOException {
         if (closed.get()) {
             throw new IOException("Tunnel already closed");
         }
         final ConnectWaiter w = new ConnectWaiter();
-        final Session s = new Session(localSocket);
+        final Session s;
+        if (localSocket != null) {
+            s = new Session(localSocket);
+        } else {
+            s = new Session(pipeIn, pipeOut);
+        }
         synchronized (lock) {
             if (waiter != null || session != null) {
                 throw new IOException("Session already in progress");
@@ -368,6 +389,15 @@ public class WsTunnelClient extends WebSocketListener {
 
         Session(Socket local) {
             this.local = local;
+            this.localIn = null;
+            this.localOut = null;
+        }
+
+        /** Constructor for stream-based (non-Socket) sessions, e.g. UDP relay pipes. */
+        Session(InputStream in, OutputStream out) {
+            this.local = null;
+            this.localIn = in;
+            this.localOut = out;
         }
 
         public Socket getLocal() {
@@ -376,8 +406,10 @@ public class WsTunnelClient extends WebSocketListener {
 
         /** Attaches local IO and starts pumping local bytes to the tunnel. */
         public void start() throws IOException {
-            localIn = local.getInputStream();
-            localOut = local.getOutputStream();
+            if (local != null) {
+                localIn = local.getInputStream();
+                localOut = local.getOutputStream();
+            }
             Thread pump = new Thread(this::pumpLocalToWs, "ech-local-pump");
             pump.setDaemon(true);
             pump.start();
@@ -456,7 +488,7 @@ public class WsTunnelClient extends WebSocketListener {
                 }
             }
             try {
-                local.close();
+                if (local != null) local.close();
             } catch (Exception ignored) {
             }
             close();
@@ -629,7 +661,12 @@ public class WsTunnelClient extends WebSocketListener {
                                 + "Host: " + target[0] + "\r\n"
                                 + "User-Agent: ProxyCloud-ech-probe\r\n"
                                 + "Connection: close\r\n\r\n";
-                        webSocket.send(req);
+                        // CRITICAL: Worker-ECH.js only forwards BINARY frames
+                        // (ArrayBuffer) to the remote; TEXT frames that don't
+                        // match a command (CONNECT:/DATA:/CLOSE) are dropped.
+                        // Send the HTTP request as a binary frame so it actually
+                        // reaches the target.
+                        webSocket.send(okio.ByteString.encodeUtf8(req));
                     } else if (text.startsWith(PREFIX_ERROR)) {
                         latch.countDown();
                     }
