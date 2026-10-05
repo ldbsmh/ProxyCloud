@@ -154,13 +154,8 @@ class V2RayService extends ChangeNotifier {
 
   late final V2ray _flutterV2ray;
 
-  // Active ech tunnel endpoint (set during connect for ech configs) — used by
-  // the through-tunnel verification probes.
-  String? _activeEchWsUrl;
-  String? _activeEchToken;
-
   // Human-readable reason for the last failed connect() — shown by ech UI so
-  // users can tell whether the Worker probe or the through-tunnel probe failed.
+  // users can tell whether the Worker probe failed.
   String? _lastConnectError;
   String? get lastConnectError => _lastConnectError;
 
@@ -311,8 +306,6 @@ class V2RayService extends ChangeNotifier {
           debugPrint('ech pre-flight WS probe failed, aborting connect');
           return false;
         }
-        _activeEchWsUrl = parser.wsUrl;
-        _activeEchToken = parser.token;
         // ECH public-key query settings flow through the ech:// URL query
         // (doh= / ech=) into the engine config, so the Go kernel can resolve
         // the Worker's ECH config.
@@ -345,26 +338,14 @@ class V2RayService extends ChangeNotifier {
       _startUsageMonitoring();
 
       // Verify the connection was actually established.
-      // For ech we do a REAL end-to-end verification instead of trusting the
-      // VPN state flag (which only means the TUN interface was created):
-      // the tunnel must actually carry HTTP traffic (generate_204 probes)
-      // before we report "connected". Otherwise we tear down and fail so the
-      // UI never shows a fake connection.
+      // For ech, real connectivity is proven by the Go kernel itself: if the
+      // kernel process dies, the service tears the VPN down and broadcasts a
+      // disconnect. There is no separate through-tunnel HTTP probe anymore —
+      // the old generate_204 probe opened its own independent WS through the
+      // VPN, bypassing the kernel, and only produced false failures.
       await Future.delayed(const Duration(milliseconds: 500));
 
-      if (parser is ECHURL) {
-        final echVerified = await _verifyEchHttp();
-        if (!echVerified) {
-          _lastConnectError = '隧道数据验证失败：generate_204 探测未通过（Worker 兼容日期或优选 IP 问题）';
-          debugPrint('ech tunnel data verification failed after connection');
-          try {
-            await disconnect();
-          } catch (e) {
-            debugPrint('Error cleaning up failed ech connection: $e');
-          }
-          return false;
-        }
-      } else {
+      if (parser is! ECHURL) {
         final connectionVerified = await isActuallyConnected();
         if (!connectionVerified) {
           _lastConnectError = '连接验证失败（v2ray 内核未就绪）';
@@ -435,48 +416,6 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  /// HTTP generate_204 probes THROUGH the established tunnel. Returns true as
-  /// soon as any endpoint answers 2xx — proves the tunnel can actually carry
-  /// data end-to-end.
-  /// HTTP generate_204 probes THROUGH the established tunnel. Returns true as
-  /// soon as any endpoint answers 2xx — proves the tunnel can actually carry
-  /// data end-to-end.
-  ///
-  /// IMPORTANT: the probe must resolve the hostname on the WORKER side, not on
-  /// this device. This engine's SOCKS5 server only supports TCP CONNECT, so
-  /// UDP DNS through the tunnel fails — a client-side DNS lookup (e.g. via
-  /// package:http) would never resolve and the probe would always fail. The
-  /// native probe opens a WS, CONNECTs to host:port (resolved by the Worker)
-  /// and sends a plain HTTP GET /generate_204.
-  Future<bool> _verifyEchHttp() async {
-    final wsUrl = _activeEchWsUrl;
-    if (wsUrl == null) {
-      debugPrint('ech 204 probe: no active ech wsUrl');
-      return false;
-    }
-    const endpoints = [
-      ('cp.cloudflare.com', 80),
-      ('www.gstatic.com', 80),
-    ];
-    for (final (host, port) in endpoints) {
-      try {
-        final probe = await _flutterV2ray.echHttpProbe(
-          wsUrl: wsUrl,
-          token: _activeEchToken,
-          host: host,
-          port: port,
-        );
-        debugPrint('ech 204 probe $host:$port -> $probe');
-        if (probe['ok'] == true) {
-          return true;
-        }
-      } catch (e) {
-        debugPrint('ech 204 probe $host:$port threw: $e');
-      }
-    }
-    return false;
-  }
-
   Future<void> disconnect() async {
     try {
       // Stop usage monitoring
@@ -496,8 +435,6 @@ class V2RayService extends ChangeNotifier {
 
       // Clear active config and last connection time
       _activeConfig = null;
-      _activeEchWsUrl = null;
-      _activeEchToken = null;
       _lastConnectionTime = null;
 
       // Clear active config from storage but keep the usage statistics

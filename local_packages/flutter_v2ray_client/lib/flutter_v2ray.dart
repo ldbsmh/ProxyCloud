@@ -123,22 +123,6 @@ class V2ray {
         .echReachability(wsUrl: wsUrl, token: token);
   }
 
-  /// HTTP generate_204 probe THROUGH the ech tunnel (Worker-side DNS).
-  /// Returns a map with `ok` and `error` keys.
-  Future<Map<String, dynamic>> echHttpProbe({
-    required String wsUrl,
-    String? token,
-    required String host,
-    int port = 80,
-  }) async {
-    return FlutterV2rayPlatform.instance.echHttpProbe(
-      wsUrl: wsUrl,
-      token: token,
-      host: host,
-      port: port,
-    );
-  }
-
   /// Stops the V2Ray service.
   /// Returns a [Future] that completes when the service is stopped.
   Future<void> stopV2Ray() async {

@@ -306,43 +306,6 @@ public class FlutterV2rayPlugin implements FlutterPlugin, MethodCallHandler, Act
                     });
                     break;
                 }
-                case "echHttpProbe": {
-                    // HTTP generate_204 probe THROUGH the tunnel. Hostname is
-                    // resolved by the Worker (server-side connect()), so this
-                    // works even when client-side UDP DNS through the tunnel is
-                    // broken (WsSocks5Server only supports TCP CONNECT).
-                    // Returns {ok: bool, error: string?}.
-                    executor.submit(() -> {
-                        try {
-                            String wsUrl = call.argument("ws_url");
-                            String token = call.argument("token");
-                            String host = call.argument("host");
-                            Integer port = call.argument("port");
-                            if (wsUrl == null || wsUrl.isEmpty() || host == null) {
-                                java.util.Map<String, Object> m = new java.util.HashMap<>();
-                                m.put("ok", false);
-                                m.put("error", "Missing ws_url/host");
-                                result.success(m);
-                                return;
-                            }
-                            int p = (port == null) ? 80 : port;
-                            dev.amirzr.flutter_v2ray_client.v2ray.services.WsProxyVpnService svc =
-                                    dev.amirzr.flutter_v2ray_client.v2ray.services.WsProxyVpnService.getInstance();
-                            boolean ok = dev.amirzr.flutter_v2ray_client.v2ray.core.WsTunnelClient
-                                    .httpProbeThroughTunnel(wsUrl, token, host, p, 12_000L, svc);
-                            java.util.Map<String, Object> m = new java.util.HashMap<>();
-                            m.put("ok", ok);
-                            m.put("error", ok ? null : "HTTP probe through tunnel failed");
-                            result.success(m);
-                        } catch (Exception e) {
-                            java.util.Map<String, Object> m = new java.util.HashMap<>();
-                            m.put("ok", false);
-                            m.put("error", String.valueOf(e.getMessage()));
-                            result.success(m);
-                        }
-                    });
-                    break;
-                }
                 default:
                     result.notImplemented();
                     break;

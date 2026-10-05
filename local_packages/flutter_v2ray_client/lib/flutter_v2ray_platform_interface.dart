@@ -103,17 +103,6 @@ abstract class FlutterV2rayPlatform extends PlatformInterface {
     throw UnimplementedError('echReachability() has not been implemented.');
   }
 
-  /// HTTP generate_204 probe THROUGH the ech tunnel (Worker-side DNS).
-  /// Returns a map with `ok` and `error` keys.
-  Future<Map<String, dynamic>> echHttpProbe({
-    required String wsUrl,
-    String? token,
-    required String host,
-    int port = 80,
-  }) {
-    throw UnimplementedError('echHttpProbe() has not been implemented.');
-  }
-
   /// Measures the delay to a V2Ray server using the provided configuration and URL.
   /// [config] is the V2Ray configuration in JSON format.
   /// [url] is the server URL to test.
