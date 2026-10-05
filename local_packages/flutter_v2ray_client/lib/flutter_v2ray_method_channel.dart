@@ -80,6 +80,23 @@ class MethodChannelFlutterV2ray extends FlutterV2rayPlatform {
     await methodChannel.invokeMethod('stopEchProxy');
   }
 
+  /// Probes the ech tunnel end-to-end: opens a WebSocket to the Worker and
+  /// performs a real CONNECT handshake (target 8.8.8.8:53). Returns a map
+  /// with `ok` (bool), `ws` (bool) and `error` (string?).
+  Future<Map<String, dynamic>> echReachability({
+    required String wsUrl,
+    String? token,
+  }) async {
+    final res = await methodChannel.invokeMethod('echReachability', {
+      'ws_url': wsUrl,
+      'token': token ?? '',
+    });
+    if (res is Map) {
+      return Map<String, dynamic>.from(res);
+    }
+    return {'ok': false, 'ws': false, 'error': 'Unexpected native response'};
+  }
+
   @override
   Future<void> stopV2Ray() async {
     await methodChannel.invokeMethod('stopV2Ray');

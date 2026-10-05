@@ -92,6 +92,15 @@ abstract class FlutterV2rayPlatform extends PlatformInterface {
     throw UnimplementedError('stopEchProxy() has not been implemented.');
   }
 
+  /// Probes the ech tunnel end-to-end (real CONNECT handshake to the Worker).
+  /// Returns a map with `ok`, `ws` and `error` keys.
+  Future<Map<String, dynamic>> echReachability({
+    required String wsUrl,
+    String? token,
+  }) {
+    throw UnimplementedError('echReachability() has not been implemented.');
+  }
+
   /// Measures the delay to a V2Ray server using the provided configuration and URL.
   /// [config] is the V2Ray configuration in JSON format.
   /// [url] is the server URL to test.

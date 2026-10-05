@@ -109,6 +109,16 @@ class V2ray {
     await FlutterV2rayPlatform.instance.stopEchProxy();
   }
 
+  /// Probes the ech tunnel end-to-end (real CONNECT handshake to the Worker).
+  /// Returns a map with `ok`, `ws` and `error` keys.
+  Future<Map<String, dynamic>> echReachability({
+    required String wsUrl,
+    String? token,
+  }) async {
+    return FlutterV2rayPlatform.instance
+        .echReachability(wsUrl: wsUrl, token: token);
+  }
+
   /// Stops the V2Ray service.
   /// Returns a [Future] that completes when the service is stopped.
   Future<void> stopV2Ray() async {

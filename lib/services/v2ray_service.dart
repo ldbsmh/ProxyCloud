@@ -288,6 +288,16 @@ class V2RayService extends ChangeNotifier {
       // WsProxyVpnService (which bypasses the v2ray core entirely).
       // For everything else, use the full v2ray JSON through the v2ray core.
       if (parser is ECHURL) {
+        // Pre-flight: probe the Worker with a real WS + CONNECT handshake
+        // BEFORE starting the VPN. At this point the tunnel does not exist yet,
+        // so the probe socket goes straight to the Worker (no tunnel loop).
+        // Failure here means the Worker is unreachable / token rejected /
+        // compatibility-date broken — don't even bother starting the VPN.
+        final wsOk = await _verifyEchWs(parser);
+        if (!wsOk) {
+          debugPrint('ech pre-flight WS probe failed, aborting connect');
+          return false;
+        }
         await _flutterV2ray.startEchProxy(
           remark: parser.remark,
           config: parser.getFullEchConfig(),
@@ -314,20 +324,39 @@ class V2RayService extends ChangeNotifier {
       // Start monitoring usage statistics
       _startUsageMonitoring();
 
-      // Verify the connection was actually established
+      // Verify the connection was actually established.
+      // For ech we do a REAL end-to-end verification instead of trusting the
+      // VPN state flag (which only means the TUN interface was created):
+      // the tunnel must actually carry HTTP traffic (generate_204 probes)
+      // before we report "connected". Otherwise we tear down and fail so the
+      // UI never shows a fake connection.
       await Future.delayed(const Duration(milliseconds: 500));
-      final connectionVerified = await isActuallyConnected();
-      if (!connectionVerified) {
-        debugPrint(
-          'Connection verification failed immediately after connection',
-        );
-        // Try to disconnect to clean up
-        try {
-          await disconnect();
-        } catch (e) {
-          debugPrint('Error cleaning up failed connection: $e');
+
+      if (parser is ECHURL) {
+        final echVerified = await _verifyEchHttp();
+        if (!echVerified) {
+          debugPrint('ech tunnel data verification failed after connection');
+          try {
+            await disconnect();
+          } catch (e) {
+            debugPrint('Error cleaning up failed ech connection: $e');
+          }
+          return false;
         }
-        return false;
+      } else {
+        final connectionVerified = await isActuallyConnected();
+        if (!connectionVerified) {
+          debugPrint(
+            'Connection verification failed immediately after connection',
+          );
+          // Try to disconnect to clean up
+          try {
+            await disconnect();
+          } catch (e) {
+            debugPrint('Error cleaning up failed connection: $e');
+          }
+          return false;
+        }
       }
 
       // Fetch IP information after a 2-second delay to ensure connection is stable
@@ -356,6 +385,55 @@ class V2RayService extends ChangeNotifier {
       }
       return false;
     }
+  }
+
+  /// Pre-flight probe for an ech Worker, run BEFORE the VPN starts: opens a
+  /// real WebSocket to the Worker and performs a CONNECT handshake
+  /// (CONNECT:8.8.8.8:53|). At this point the tunnel does not exist yet, so
+  /// the probe socket goes straight to the Worker — no tunnel loop. Returns
+  /// true when the Worker answers CONNECTED (or an ERROR, which still proves
+  /// the WS + protocol path works).
+  Future<bool> _verifyEchWs(ECHURL parser) async {
+    try {
+      final probe = await _flutterV2ray.echReachability(
+        wsUrl: parser.wsUrl,
+        token: parser.token,
+      );
+      final ok = probe['ok'] == true || probe['ws'] == true;
+      debugPrint('ech pre-flight WS probe: $probe');
+      if (!ok) {
+        final err = probe['error'];
+        debugPrint('ech pre-flight WS probe failed: $err');
+      }
+      return ok;
+    } catch (e) {
+      debugPrint('ech pre-flight WS probe threw: $e');
+      return false;
+    }
+  }
+
+  /// HTTP generate_204 probes THROUGH the established tunnel. Returns true as
+  /// soon as any endpoint answers 2xx — proves the tunnel can actually carry
+  /// data end-to-end.
+  Future<bool> _verifyEchHttp() async {
+    const endpoints = [
+      'https://www.gstatic.com/generate_204',
+      'https://cp.cloudflare.com/generate_204',
+    ];
+    for (final url in endpoints) {
+      try {
+        final resp = await http
+            .get(Uri.parse(url))
+            .timeout(const Duration(seconds: 10));
+        debugPrint('ech 204 probe $url -> ${resp.statusCode}');
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          return true;
+        }
+      } catch (e) {
+        debugPrint('ech 204 probe $url failed: $e');
+      }
+    }
+    return false;
   }
 
   Future<void> disconnect() async {

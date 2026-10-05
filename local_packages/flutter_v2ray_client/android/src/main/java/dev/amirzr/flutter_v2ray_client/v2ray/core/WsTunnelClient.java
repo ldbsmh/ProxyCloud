@@ -433,6 +433,85 @@ public class WsTunnelClient extends WebSocketListener {
         }
     }
 
+    /**
+     * Static reachability probe for the ech tunnel (no VpnService needed).
+     *
+     * <p>Opens a WebSocket to the Worker, sends the standard CONNECT frame for a
+     * probe target that is guaranteed to be connectable (8.8.8.8:53 — deliberately
+     * NOT a Cloudflare-owned address, because Worker {@code connect()} refuses to
+     * dial back into Cloudflare's own ranges and would answer ERROR even on a
+     * healthy tunnel) and classifies the outcome:
+     * <ul>
+     *   <li>{@code CONNECTED} — tunnel is alive end-to-end.</li>
+     *   <li>{@code ERROR:...} — Worker understood CONNECT but could not reach the
+     *       target (still proves the WS + protocol path works).</li>
+     *   <li>anything else / timeout / WS failure — tunnel is not usable.</li>
+     * </ul>
+     * Returns {@code true} when the tunnel can carry traffic, {@code false} otherwise.
+     */
+    public static boolean checkReachability(String wsUrl, String token, long timeoutMs) {
+        final OkHttpClient client = new OkHttpClient.Builder()
+                .connectTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .readTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                .retryOnConnectionFailure(false)
+                .build();
+        final Request.Builder rb = new Request.Builder().url(wsUrl);
+        if (token != null && !token.isEmpty()) {
+            rb.header("Sec-WebSocket-Protocol", token);
+        }
+        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+        final AtomicBoolean verdict = new AtomicBoolean(false);
+        final String[] probeTarget = {"8.8.8.8", "53"};
+        WebSocket probeWs = null;
+        try {
+            probeWs = client.newWebSocket(rb.build(), new WebSocketListener() {
+                @Override
+                public void onOpen(@NonNull WebSocket webSocket, @NonNull Response response) {
+                    webSocket.send(PREFIX_CONNECT + probeTarget[0] + ":" + probeTarget[1] + "|");
+                }
+
+                @Override
+                public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
+                    if (text.equals(REPLY_CONNECTED)) {
+                        verdict.set(true);
+                        latch.countDown();
+                    } else if (text.startsWith(PREFIX_ERROR)) {
+                        // Worker understood CONNECT; target unreachable is enough to
+                        // prove the WS + protocol path works.
+                        verdict.set(true);
+                        latch.countDown();
+                    }
+                }
+
+                @Override
+                public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, Response response) {
+                    latch.countDown();
+                }
+
+                @Override
+                public void onClosed(@NonNull WebSocket webSocket, int code, @NonNull String reason) {
+                    latch.countDown();
+                }
+            });
+            return latch.await(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS) && verdict.get();
+        } catch (Exception e) {
+            Log.w(TAG, "checkReachability failed: " + e.getMessage());
+            return false;
+        } finally {
+            // Best-effort cleanup: cancel the probe WS (single-use) and shut
+            // down this probe-only client's dispatcher.
+            try {
+                if (probeWs != null) probeWs.cancel();
+            } catch (Exception ignored) {
+            }
+            try {
+                client.dispatcher().executorService().shutdown();
+            } catch (Exception ignored) {
+            }
+        }
+    }
+
     /** Two-phase CONNECT handshake latch (wait for onOpen, then CONNECTED). */
     private static class ConnectWaiter {
         private final Object lock = new Object();
