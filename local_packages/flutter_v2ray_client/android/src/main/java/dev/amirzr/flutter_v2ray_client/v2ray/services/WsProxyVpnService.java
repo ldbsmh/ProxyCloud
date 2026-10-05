@@ -61,6 +61,7 @@ public class WsProxyVpnService extends VpnService {
 
     private String wsUrl;
     private String token;
+    private String preferredIp;
     private String remark;
     private ArrayList<String> blockedApps;
     private ArrayList<String> bypassSubnets;
@@ -93,6 +94,7 @@ public class WsProxyVpnService extends VpnService {
 
         wsUrl = intent.getStringExtra("WS_URL");
         token = intent.getStringExtra("WS_TOKEN");
+        preferredIp = intent.getStringExtra("WS_PREFERRED_IP");
         remark = intent.getStringExtra("REMARK");
         blockedApps = intent.getStringArrayListExtra("BLOCKED_APPS");
         bypassSubnets = intent.getStringArrayListExtra("BYPASS_SUBNETS");
@@ -161,7 +163,7 @@ public class WsProxyVpnService extends VpnService {
             startForegroundCompat();
             startDurationTimer();
             if (pool == null) {
-                pool = new WsTunnelPool(wsUrl, token, this);
+                pool = new WsTunnelPool(wsUrl, token, this, preferredIp);
             }
             startSocksServer();
             runTun2socks();

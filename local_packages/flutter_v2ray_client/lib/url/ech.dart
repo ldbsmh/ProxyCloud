@@ -76,6 +76,10 @@ class ECHURL extends V2RayURL {
   /// Fallback IPs for the `CF_FALLBACK_IPS`-style candidates, empty if none.
   String get fallbackIps => uri.queryParameters['fallback'] ?? '';
 
+  /// Preferred connect IP (优选IP/中转IP) for the Worker domain, empty if none.
+  /// The native engine connects to this IP but keeps the domain in Host/SNI.
+  String get preferredIp => uri.queryParameters['ip'] ?? '';
+
   /// The ws(s):// URL without any query parameters.
   String get bareWsUrl {
     final scheme = uri.scheme == 'ws' ? 'ws' : 'wss';
@@ -95,6 +99,7 @@ class ECHURL extends V2RayURL {
         'wsUrl': wsUrl,
         'token': token,
         'fallbackIps': fallbackIps,
+        'preferredIp': preferredIp,
       };
 
   @override

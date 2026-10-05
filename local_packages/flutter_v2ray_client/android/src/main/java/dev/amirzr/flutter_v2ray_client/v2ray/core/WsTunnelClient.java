@@ -80,6 +80,9 @@ public class WsTunnelClient extends WebSocketListener {
     private final String wsUrl;
     private final String token;
 
+    /** Preferred connect IP for the Worker domain (优选IP/中转IP), or null. */
+    private final String preferredIp;
+
     /** VpnService used to protect the WebSocket socket (bypass the tunnel). */
     private final VpnService vpnService;
 
@@ -97,6 +100,27 @@ public class WsTunnelClient extends WebSocketListener {
                 .connectionPool(SHARED_POOL);
         if (vpnService != null) {
             b.socketFactory(new ProtectedSocketFactory(vpnService));
+        }
+        if (preferredIp != null && !preferredIp.isEmpty()) {
+            // Connect to the preferred IP (优选IP/中转) but keep the Worker
+            // domain in the URL: Host header and TLS SNI stay the domain,
+            // while the actual TCP connection goes to the preferred IP. The
+            // middle server (reverse proxy / relay) routes by Host.
+            final String ip = preferredIp;
+            b.dns(new okhttp3.Dns() {
+                @Override
+                public java.util.List<java.net.InetAddress> lookup(String hostname)
+                        throws java.net.UnknownHostException {
+                    java.util.List<java.net.InetAddress> addrs =
+                            new java.util.ArrayList<>();
+                    try {
+                        addrs.add(java.net.InetAddress.getByName(ip));
+                    } catch (java.net.UnknownHostException e) {
+                        throw e;
+                    }
+                    return addrs;
+                }
+            });
         }
         return b.build();
     }
@@ -118,9 +142,15 @@ public class WsTunnelClient extends WebSocketListener {
             });
 
     public WsTunnelClient(String wsUrl, String token, VpnService vpnService) {
+        this(wsUrl, token, vpnService, null);
+    }
+
+    public WsTunnelClient(String wsUrl, String token, VpnService vpnService,
+                          String preferredIp) {
         this.wsUrl = wsUrl;
         this.token = token == null ? "" : token;
         this.vpnService = vpnService;
+        this.preferredIp = preferredIp;
         this.httpClient = buildClient();
     }
 
@@ -449,13 +479,39 @@ public class WsTunnelClient extends WebSocketListener {
      * </ul>
      * Returns {@code true} when the tunnel can carry traffic, {@code false} otherwise.
      */
+    /**
+     * If {@code wsUrl} carries an {@code ip=...} query parameter (优选IP/中转IP),
+     * configure the client's Dns to resolve every hostname to that IP. The URL
+     * keeps the Worker domain, so the Host header and TLS SNI stay correct
+     * while the TCP connection goes to the preferred IP.
+     */
+    private static void applyPreferredIp(OkHttpClient.Builder b, String wsUrl) {
+        try {
+            okhttp3.HttpUrl url = okhttp3.HttpUrl.get(wsUrl);
+            String ip = url.queryParameter("ip");
+            if (ip == null || ip.isEmpty()) return;
+            final String fixed = ip;
+            b.dns(new okhttp3.Dns() {
+                @Override
+                public java.util.List<java.net.InetAddress> lookup(String hostname)
+                        throws java.net.UnknownHostException {
+                    java.util.List<java.net.InetAddress> addrs = new java.util.ArrayList<>();
+                    addrs.add(java.net.InetAddress.getByName(fixed));
+                    return addrs;
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
     public static boolean checkReachability(String wsUrl, String token, long timeoutMs) {
-        final OkHttpClient client = new OkHttpClient.Builder()
+        OkHttpClient.Builder b = new OkHttpClient.Builder()
                 .connectTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .readTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .retryOnConnectionFailure(false)
-                .build();
+                .retryOnConnectionFailure(false);
+        applyPreferredIp(b, wsUrl);
+        final OkHttpClient client = b.build();
         final Request.Builder rb = new Request.Builder().url(wsUrl);
         if (token != null && !token.isEmpty()) {
             rb.header("Sec-WebSocket-Protocol", token);
@@ -544,6 +600,7 @@ public class WsTunnelClient extends WebSocketListener {
                 .readTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .writeTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
                 .retryOnConnectionFailure(false);
+        applyPreferredIp(b, wsUrl);
         if (vpnService != null) {
             b.socketFactory(new ProtectedSocketFactory(vpnService));
         }

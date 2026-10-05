@@ -159,16 +159,27 @@ class EchProvider extends ChangeNotifier {
     notifyListeners();
 
     // Build a V2RayConfig whose fullConfig is an ech:// URL.
-    // ECHURL parses `ech://host:port` and the engine config is built from
-    // node + settings.
+    // The URL HOST must be the Worker DOMAIN (so the WS request carries the
+    // right Host header / TLS SNI — a middle server like a 优选IP reverse
+    // proxy routes by Host). The node's IP (优选IP / 中转) is passed as the
+    // `ip` query param; ECHURL reads it and the native engine connects to that
+    // IP while keeping the domain in Host/SNI.
+    final domain = _settings.workerDomain
+        .trim()
+        .replaceFirst(RegExp(r'^https?://'), '')
+        .replaceAll(RegExp(r'/.*$'), '')
+        .trim();
+    final host = domain.isNotEmpty ? domain : node.address;
     final remark = node.remark.isNotEmpty ? node.remark : 'ECH ${node.endpoint}';
+    final token = _settings.token.trim();
+    final tokenParam = token.isNotEmpty ? '&token=$token' : '';
     final config = V2RayConfig(
       id: node.id,
       remark: remark,
       address: node.address,
       port: node.port,
       configType: 'ech',
-      fullConfig: 'ech://${node.endpoint}',
+      fullConfig: 'ech://$host:${node.port}?ip=${node.address}$tokenParam',
     );
 
     final ok = await _v2rayService.connect(config, false);

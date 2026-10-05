@@ -20,12 +20,19 @@ public class WsTunnelPool {
     private final String wsUrl;
     private final String token;
     private final VpnService vpnService;
+    private final String preferredIp;
     private volatile boolean closed;
 
     public WsTunnelPool(String wsUrl, String token, VpnService vpnService) {
+        this(wsUrl, token, vpnService, null);
+    }
+
+    public WsTunnelPool(String wsUrl, String token, VpnService vpnService,
+                        String preferredIp) {
         this.wsUrl = wsUrl;
         this.token = token;
         this.vpnService = vpnService;
+        this.preferredIp = preferredIp;
     }
 
     /**
@@ -38,7 +45,7 @@ public class WsTunnelPool {
         if (closed) {
             throw new IOException("Tunnel pool closed");
         }
-        WsTunnelClient client = new WsTunnelClient(wsUrl, token, vpnService);
+        WsTunnelClient client = new WsTunnelClient(wsUrl, token, vpnService, preferredIp);
         try {
             WsTunnelClient.Session session = client.connectAndAwait(localSocket, host, port);
             return session;
