@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/telegram_proxy_provider.dart';
+import 'providers/ech_provider.dart';
 import 'providers/v2ray_provider.dart';
 import 'providers/language_provider.dart';
 import 'services/wallpaper_service.dart';
@@ -91,6 +92,7 @@ class _MyAppState extends State<MyApp> {
       providers: [
         ChangeNotifierProvider.value(value: widget.languageProvider),
         ChangeNotifierProvider(create: (context) => V2RayProvider()),
+        ChangeNotifierProvider(create: (context) => EchProvider()),
         ChangeNotifierProvider(create: (context) => TelegramProxyProvider()),
         ChangeNotifierProvider(
           create: (context) {

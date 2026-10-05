@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../utils/app_localizations.dart';
 import '../theme/app_theme.dart';
 import '../widgets/error_snackbar.dart';
+import 'ech_screen.dart';
 import 'home_screen.dart';
 import 'tools_screen.dart';
 
@@ -19,9 +20,10 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
-  // 只保留 VPN (HomeScreen) 和 工具 (ToolsScreen)
+  // VPN / ECH / 工具
   final List<Widget> _screens = [
     const HomeScreen(),
+    const EchScreen(),
     const ToolsScreen(),
   ];
 
@@ -136,13 +138,27 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                     ),
                     label: context.tr(TranslationKeys.navVpn),
                   ),
-                  // 工具页面按钮
+                  // ECH 页面按钮
                   BottomNavigationBarItem(
                     icon: Container(
                       padding: const EdgeInsets.all(4.0),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: _currentIndex == 1
+                            ? AppTheme.primaryBlue.withOpacity(0.2)
+                            : Colors.transparent,
+                      ),
+                      child: const Icon(Icons.wifi_tethering_rounded),
+                    ),
+                    label: context.tr(TranslationKeys.navEch),
+                  ),
+                  // 工具页面按钮
+                  BottomNavigationBarItem(
+                    icon: Container(
+                      padding: const EdgeInsets.all(4.0),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: _currentIndex == 2
                             ? AppTheme.primaryBlue.withOpacity(0.2)
                             : Colors.transparent,
                       ),

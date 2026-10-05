@@ -13,7 +13,8 @@
         "vpn": "VPN",
         "proxy": "Proxy",
         "store": "Store",
-        "tools": "Tools"
+        "tools": "Tools",
+        "ech": "ECH"
     },
     "tools": {
         "title": "Tools",
@@ -547,5 +548,44 @@
     },
     "ircf": {
         "channel": "IRCF"
+    },
+    "ech": {
+        "title": "ECH Proxy",
+        "settings": "ECH Settings",
+        "nodes_title": "ECH Nodes",
+        "nodes_subtitle": "Direct WebSocket tunnel nodes",
+        "no_nodes": "No nodes yet",
+        "no_nodes_subtitle": "Add an IP:port endpoint to get started",
+        "add_node": "Add Node",
+        "edit_node": "Edit Node",
+        "delete": "Delete",
+        "delete_title": "Delete Node",
+        "delete_confirm": "Remove this node?",
+        "ip": "IP",
+        "port": "Port",
+        "remark": "Remark",
+        "remark_hint": "Optional name",
+        "ip_required": "IP required",
+        "port_invalid": "Port must be 1-65535",
+        "in_use": "In use",
+        "edit": "Edit",
+        "select_hint": "Select a node, then start the proxy",
+        "service_address": "Service address",
+        "token_hint": "Identity token (optional)",
+        "listen_port": "Local proxy port",
+        "listen_hint": "Port for local SOCKS proxy",
+        "doh_server": "ECH DoH server",
+        "pubkey_domain": "ECH public key query domain",
+        "vpn_takeover": "Global VPN takeover",
+        "vpn_takeover_sub": "Off = local proxy mode only",
+        "per_app": "Per-app proxy",
+        "per_app_sub": "Route selected apps through the tunnel",
+        "mode_allow": "Only selected apps use proxy",
+        "mode_deny": "Selected apps bypass proxy",
+        "select_apps": "Select Apps",
+        "settings_server": "Server Settings",
+        "settings_doh": "DoH & Public Key",
+        "settings_local": "Local & Mode",
+        "settings_mode": "Per-App Mode"
     }
 }

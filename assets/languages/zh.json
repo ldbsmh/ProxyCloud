@@ -13,7 +13,8 @@
     "vpn": "VPN",
     "proxy": "代理",
     "store": "商店",
-    "tools": "工具"
+    "tools": "工具",
+    "ech": "ECH"
   },
   "tools": {
     "title": "工具",
@@ -547,5 +548,44 @@
   },
   "ircf": {
     "channel": "IRCF"
+  },
+  "ech": {
+    "title": "ECH",
+    "settings": "设置",
+    "nodes_title": "ECH 节点",
+    "nodes_subtitle": "IP:端口 隧道节点",
+    "no_nodes": "还没有节点",
+    "no_nodes_subtitle": "点击右上角 + 添加第一个 IP:端口 节点",
+    "add_node": "添加节点",
+    "edit_node": "编辑节点",
+    "ip": "IP 地址",
+    "ip_required": "请输入 IP 地址",
+    "port": "端口",
+    "port_invalid": "端口无效（1-65535）",
+    "remark": "备注（可选）",
+    "remark_hint": "例如：CF Worker 1",
+    "select_hint": "点击选择要使用的节点",
+    "in_use": "使用中",
+    "edit": "编辑",
+    "delete": "删除",
+    "delete_title": "删除节点",
+    "delete_confirm": "确定删除该节点？",
+    "service_address": "服务地址（Worker 域名）",
+    "token_hint": "身份令牌（可选）",
+    "listen_port": "本地代理端口",
+    "listen_hint": "SOCKS5 本地监听端口",
+    "settings_server": "服务器",
+    "settings_doh": "ECH 配置",
+    "doh_server": "ECH DOH 服务器",
+    "pubkey_domain": "ECH 公钥查询域名",
+    "settings_local": "本地设置",
+    "settings_mode": "代理模式",
+    "vpn_takeover": "VPN 全局接管",
+    "vpn_takeover_sub": "关闭后仅本地代理模式（不接管全部流量）",
+    "per_app": "分应用代理",
+    "per_app_sub": "仅对选中应用生效",
+    "mode_allow": "仅允许选中应用走代理",
+    "mode_deny": "选中应用不走代理",
+    "select_apps": "选择应用"
   }
 }

@@ -125,6 +125,7 @@ class TranslationKeys {
   static const String navVpn = 'navigation.vpn';
   static const String navProxy = 'navigation.proxy';
   static const String navStore = 'navigation.store';
+  static const String navEch = 'navigation.ech';
   static const String navTools = 'navigation.tools';
 
   // Tools
