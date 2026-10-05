@@ -173,13 +173,16 @@ class EchProvider extends ChangeNotifier {
     final remark = node.remark.isNotEmpty ? node.remark : 'ECH ${node.endpoint}';
     final token = _settings.token.trim();
     final tokenParam = token.isNotEmpty ? '&token=$token' : '';
+    final dohParam = '&doh=${Uri.encodeQueryComponent(_settings.dohServer.trim())}';
+    final echParam = '&ech=${Uri.encodeQueryComponent(_settings.pubKeyDomain.trim())}';
     final config = V2RayConfig(
       id: node.id,
       remark: remark,
       address: node.address,
       port: node.port,
       configType: 'ech',
-      fullConfig: 'ech://$host:${node.port}?ip=${node.address}$tokenParam',
+      fullConfig:
+          'ech://$host:${node.port}?ip=${node.address}$tokenParam$dohParam$echParam',
     );
 
     final ok = await _v2rayService.connect(config, false);

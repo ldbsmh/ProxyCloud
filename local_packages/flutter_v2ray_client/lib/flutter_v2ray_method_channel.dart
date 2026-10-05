@@ -64,12 +64,16 @@ class MethodChannelFlutterV2ray extends FlutterV2rayPlatform {
   Future<void> startEchProxy({
     required String remark,
     required String config,
+    String dohServer = '',
+    String pubKeyDomain = '',
     List<String>? blockedApps,
     List<String>? bypassSubnets,
   }) async {
     await methodChannel.invokeMethod('startEchProxy', {
       'remark': remark,
       'config': config,
+      'doh_server': dohServer,
+      'pubkey_domain': pubKeyDomain,
       'blocked_apps': blockedApps,
       'bypass_subnets': bypassSubnets,
     });

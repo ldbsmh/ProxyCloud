@@ -80,6 +80,12 @@ class ECHURL extends V2RayURL {
   /// The native engine connects to this IP but keeps the domain in Host/SNI.
   String get preferredIp => uri.queryParameters['ip'] ?? '';
 
+  /// ECH DoH server used to resolve the Worker's ECH public key, empty if none.
+  String get dohServer => uri.queryParameters['doh'] ?? '';
+
+  /// ECH public-key query domain, empty if none.
+  String get pubKeyDomain => uri.queryParameters['ech'] ?? '';
+
   /// The ws(s):// URL without any query parameters.
   String get bareWsUrl {
     final scheme = uri.scheme == 'ws' ? 'ws' : 'wss';
@@ -100,6 +106,8 @@ class ECHURL extends V2RayURL {
         'token': token,
         'fallbackIps': fallbackIps,
         'preferredIp': preferredIp,
+        'dohServer': uri.queryParameters['doh'] ?? '',
+        'pubKeyDomain': uri.queryParameters['ech'] ?? '',
       };
 
   @override

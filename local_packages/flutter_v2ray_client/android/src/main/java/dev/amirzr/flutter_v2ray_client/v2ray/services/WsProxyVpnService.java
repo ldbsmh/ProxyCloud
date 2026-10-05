@@ -21,12 +21,12 @@ import androidx.core.app.NotificationCompat;
 
 import java.io.File;
 import java.io.FileDescriptor;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.ArrayList;
 
-import dev.amirzr.flutter_v2ray_client.v2ray.core.WsSocks5Server;
-import dev.amirzr.flutter_v2ray_client.v2ray.core.WsTunnelPool;
 import dev.amirzr.flutter_v2ray_client.v2ray.utils.AppConfigs;
 import dev.amirzr.flutter_v2ray_client.v2ray.utils.Utilities;
 
@@ -35,15 +35,18 @@ import dev.amirzr.flutter_v2ray_client.v2ray.utils.Utilities;
  * (ech.txt protocol).
  *
  * <p>Establishes a VPN interface, runs tun2socks to redirect all app traffic
- * to a local SOCKS5 server ({@link WsSocks5Server}), and forwards every SOCKS5
- * connection through a {@link WsTunnelPool} to the Worker using the custom
- * CONNECT/DATA/CLOSE WebSocket frame protocol. This engine completely bypasses
- * the libv2ray core.
+ * to a local SOCKS5 server, and forwards every connection through the Go
+ * kernel (x-tunnel, the EchOS engine) which dials the Worker over a WebSocket
+ * tunnel using the CONNECT/DATA/CLOSE frame protocol. The Go kernel handles
+ * TCP + UDP/DNS (DNS-over-TCP / DoH) natively, so this engine completely
+ * bypasses the libv2ray core.
  */
 public class WsProxyVpnService extends VpnService {
 
     private static final String TAG = "WsProxyVpnService";
     private static final int NOTIFICATION_ID = 1;
+    /** Port the Go kernel exposes its SOCKS5 server on (tun2socks target). */
+    private static final int KERNEL_SOCKS5_PORT = 10808;
 
     /** Latest running instance, for native probes that need socket protection. */
     private static volatile WsProxyVpnService sInstance;
@@ -55,13 +58,14 @@ public class WsProxyVpnService extends VpnService {
 
     private ParcelFileDescriptor mInterface;
     private Process tunProcess;
-    private WsSocks5Server socksServer;
-    private WsTunnelPool pool;
+    private Process kernelProcess;
     private volatile boolean isRunning = true;
 
     private String wsUrl;
     private String token;
     private String preferredIp;
+    private String dohServer;
+    private String pubKeyDomain;
     private String remark;
     private ArrayList<String> blockedApps;
     private ArrayList<String> bypassSubnets;
@@ -77,6 +81,7 @@ public class WsProxyVpnService extends VpnService {
         sInstance = this;
         isRunning = false;
         tunProcess = null;
+        kernelProcess = null;
         mInterface = null;
     }
 
@@ -95,6 +100,8 @@ public class WsProxyVpnService extends VpnService {
         wsUrl = intent.getStringExtra("WS_URL");
         token = intent.getStringExtra("WS_TOKEN");
         preferredIp = intent.getStringExtra("WS_PREFERRED_IP");
+        dohServer = intent.getStringExtra("ECH_DOH_SERVER");
+        pubKeyDomain = intent.getStringExtra("ECH_PUBKEY_DOMAIN");
         remark = intent.getStringExtra("REMARK");
         blockedApps = intent.getStringArrayListExtra("BLOCKED_APPS");
         bypassSubnets = intent.getStringArrayListExtra("BYPASS_SUBNETS");
@@ -162,10 +169,7 @@ public class WsProxyVpnService extends VpnService {
             AppConfigs.V2RAY_STATE = AppConfigs.V2RAY_STATES.V2RAY_CONNECTED;
             startForegroundCompat();
             startDurationTimer();
-            if (pool == null) {
-                pool = new WsTunnelPool(wsUrl, token, this, preferredIp);
-            }
-            startSocksServer();
+            startGoKernel();
             runTun2socks();
         } catch (Exception e) {
             Log.e(TAG, "Failed to establish VPN interface", e);
@@ -173,10 +177,131 @@ public class WsProxyVpnService extends VpnService {
         }
     }
 
-    private void startSocksServer() {
-        socksServer = new WsSocks5Server(pool);
-        socksServer.start();
-        Log.d(TAG, "SOCKS5 server started on 127.0.0.1:" + WsSocks5Server.PORT);
+    /**
+     * Extracts the Go kernel (x-tunnel, EchOS engine) from assets and starts
+     * it as a child process with the SOCKS5 listener the tunnel feeds into.
+     */
+    private void startGoKernel() {
+        try {
+            File kernel = extractKernel();
+            ArrayList<String> cmd = new ArrayList<>();
+            cmd.add(kernel.getAbsolutePath());
+            // Local SOCKS5 listener: tun2socks connects here
+            cmd.add("-l");
+            cmd.add("socks5://127.0.0.1:" + KERNEL_SOCKS5_PORT);
+            // Worker WS endpoint. wsUrl is ech://domain:port?ip=...&token=...
+            // (or ws:// / wss://). Build the -f target from the URL's scheme,
+            // host and port so the Host header / SNI carry the Worker domain,
+            // while -ip points the TCP connection at the preferred IP.
+            String scheme = "wss";
+            String hostPort = wsUrl;
+            if (wsUrl != null) {
+                String u = wsUrl;
+                int q = u.indexOf('?');
+                if (q >= 0) u = u.substring(0, q);
+                if (u.startsWith("ech://")) u = "wss://" + u.substring("ech://".length());
+                if (u.startsWith("ws://")) {
+                    scheme = "ws";
+                } else if (u.startsWith("wss://")) {
+                    scheme = "wss";
+                } else if (u.indexOf("://") < 0) {
+                    u = "wss://" + u;
+                }
+                hostPort = u;
+            }
+            cmd.add("-f");
+            cmd.add(hostPort);
+            cmd.add("-n");
+            cmd.add("3");
+            if (preferredIp != null && !preferredIp.isEmpty()) {
+                cmd.add("-ip");
+                cmd.add(preferredIp);
+            }
+            if (token != null && !token.isEmpty()) {
+                cmd.add("-token");
+                cmd.add(token);
+            }
+            // ECH public-key bootstrap: the Worker is served through Cloudflare,
+            // which offers ECH (TLS Encrypted Client Hello). The kernel resolves
+            // the ECH config via DoH (-dns) for the given domain (-ech), same
+            // as the EchOS client. Falls back to the kernel defaults (doh.pub,
+            // cloudflare-ech.com) when the user left the settings blank.
+            cmd.add("-ech");
+            cmd.add(pubKeyDomain != null && !pubKeyDomain.isEmpty()
+                    ? pubKeyDomain : "cloudflare-ech.com");
+            cmd.add("-dns");
+            cmd.add(dohServer != null && !dohServer.isEmpty()
+                    ? dohServer : "https://doh.pub/dns-query");
+            // Block UDP 443 (QUIC) like EchOS does
+            cmd.add("-block");
+            cmd.add("443");
+            cmd.add("-default");
+            cmd.add("all");
+            cmd.add("-loglevel");
+            cmd.add("info");
+
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            kernelProcess = pb.start();
+            Log.d(TAG, "Go kernel started (pid=" + kernelProcess.pid() + "): " + hostPort
+                    + (preferredIp != null ? " ip=" + preferredIp : ""));
+            // Consume kernel logs so the pipe doesn't fill up
+            Thread logThread = new Thread(() -> {
+                try (InputStream is = kernelProcess.getInputStream()) {
+                    byte[] buf = new byte[4096];
+                    int n;
+                    while ((n = is.read(buf)) > 0) {
+                        if (true) {
+                            Log.d(TAG, "kernel: " + new String(buf, 0, n).trim());
+                        }
+                    }
+                } catch (IOException ignored) {
+                }
+            }, "ech-kernel-log");
+            logThread.setDaemon(true);
+            logThread.start();
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start Go kernel", e);
+        }
+    }
+
+    /** Copies the packaged Go kernel binary out of assets and makes it executable. */
+    private File extractKernel() throws IOException {
+        File dir = new File(getFilesDir(), "ech");
+        if (!dir.exists() && !dir.mkdirs()) {
+            throw new IOException("cannot create " + dir);
+        }
+        File target = new File(dir, "xtun");
+        // Asset names: xtun-arm64 (aarch64) / xtun-arm (armeabi-v7a) / xtun-x86_64.
+        // (Android reports ABIs like "arm64-v8a" — map them to our asset names.)
+        String abi = android.os.Build.SUPPORTED_ABIS != null && android.os.Build.SUPPORTED_ABIS.length > 0
+                ? android.os.Build.SUPPORTED_ABIS[0] : "arm64-v8a";
+        String assetName;
+        if (abi.startsWith("arm64")) {
+            assetName = "xtun-arm64";
+        } else if (abi.startsWith("armeabi")) {
+            assetName = "xtun-arm";
+        } else if (abi.startsWith("x86_64") || abi.startsWith("x86")) {
+            assetName = "xtun-x86_64";
+        } else {
+            throw new IOException("unsupported ABI: " + abi);
+        }
+        boolean exists = target.exists() && target.length() > 1000000;
+        if (!exists) {
+            try (InputStream is = getAssets().open(assetName)) {
+                try (OutputStream os = new FileOutputStream(target)) {
+                    byte[] buf = new byte[32768];
+                    int n;
+                    while ((n = is.read(buf)) > 0) {
+                        os.write(buf, 0, n);
+                    }
+                }
+            }
+        }
+        if (!target.setExecutable(true, true)) {
+            Log.w(TAG, "setExecutable failed for " + target);
+        }
+        return target;
     }
 
     private void runTun2socks() {
@@ -267,14 +392,7 @@ public class WsProxyVpnService extends VpnService {
         } catch (Exception ignored) {
         }
         sendDisconnectedBroadcast();
-        if (pool != null) {
-            pool.close();
-            pool = null;
-        }
-        if (socksServer != null) {
-            socksServer.stop();
-            socksServer = null;
-        }
+        stopKernel();
         if (tunProcess != null) {
             try {
                 tunProcess.destroy();
@@ -300,9 +418,26 @@ public class WsProxyVpnService extends VpnService {
         stopSelf();
     }
 
+    private void stopKernel() {
+        if (kernelProcess != null) {
+            try {
+                kernelProcess.destroy();
+                if (!kernelProcess.waitFor(1, java.util.concurrent.TimeUnit.SECONDS)) {
+                    kernelProcess.destroyForcibly();
+                }
+            } catch (Exception e) {
+                try {
+                    kernelProcess.destroyForcibly();
+                } catch (Exception ignored) {
+                }
+            }
+            kernelProcess = null;
+        }
+    }
+
     private void startForegroundCompat() {
         // Android 13+ requires POST_NOTIFICATIONS permission to show the notification.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (Build.VERSION.SDK_INT >= 33) {
             if (ActivityCompat.checkSelfPermission(this,
                     Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 // Still start foreground with a minimal notification; Android allows

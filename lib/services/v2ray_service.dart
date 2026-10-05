@@ -313,9 +313,14 @@ class V2RayService extends ChangeNotifier {
         }
         _activeEchWsUrl = parser.wsUrl;
         _activeEchToken = parser.token;
+        // ECH public-key query settings flow through the ech:// URL query
+        // (doh= / ech=) into the engine config, so the Go kernel can resolve
+        // the Worker's ECH config.
         await _flutterV2ray.startEchProxy(
           remark: parser.remark,
           config: parser.getFullEchConfig(),
+          dohServer: parser.dohServer,
+          pubKeyDomain: parser.pubKeyDomain,
           blockedApps: blockedAppsList,
           bypassSubnets: bypassSubnets,
         );

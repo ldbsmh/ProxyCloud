@@ -190,6 +190,8 @@ public class FlutterV2rayPlugin implements FlutterPlugin, MethodCallHandler, Act
                         intent.putExtra("WS_URL", wsUrl);
                         intent.putExtra("WS_TOKEN", cfg.optString("token"));
                         intent.putExtra("WS_PREFERRED_IP", cfg.optString("preferredIp"));
+                        intent.putExtra("ECH_DOH_SERVER", call.argument("doh_server"));
+                        intent.putExtra("ECH_PUBKEY_DOMAIN", call.argument("pubkey_domain"));
                         final Object remarkArg = call.argument("remark");
                         intent.putExtra("REMARK", remarkArg != null ? remarkArg.toString() : "");
                         intent.putStringArrayListExtra("BLOCKED_APPS", call.argument("blocked_apps"));

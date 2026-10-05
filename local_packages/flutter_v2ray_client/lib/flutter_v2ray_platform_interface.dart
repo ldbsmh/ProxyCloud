@@ -80,6 +80,8 @@ abstract class FlutterV2rayPlatform extends PlatformInterface {
   Future<void> startEchProxy({
     required String remark,
     required String config,
+    String dohServer = '',
+    String pubKeyDomain = '',
     List<String>? blockedApps,
     List<String>? bypassSubnets,
   }) {

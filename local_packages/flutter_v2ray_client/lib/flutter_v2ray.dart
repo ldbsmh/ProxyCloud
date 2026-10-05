@@ -93,12 +93,16 @@ class V2ray {
   Future<void> startEchProxy({
     required String remark,
     required String config,
+    String dohServer = '',
+    String pubKeyDomain = '',
     List<String>? blockedApps,
     List<String>? bypassSubnets,
   }) async {
     await FlutterV2rayPlatform.instance.startEchProxy(
       remark: remark,
       config: config,
+      dohServer: dohServer,
+      pubKeyDomain: pubKeyDomain,
       blockedApps: blockedApps,
       bypassSubnets: bypassSubnets,
     );
