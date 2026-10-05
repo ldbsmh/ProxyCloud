@@ -96,24 +96,10 @@ class EchSettingsScreen extends StatelessWidget {
                   value: ech.vpnTakeover,
                   onChanged: ech.setVpnTakeover,
                 ),
-                SwitchListTile(
-                  title: Text(t.tr('ech.per_app')),
-                  subtitle: Text(t.tr('ech.per_app_sub')),
-                  value: ech.perAppEnabled,
-                  onChanged: ech.setPerAppEnabled,
+                _InfoRow(
+                  icon: Icons.block,
+                  text: t.tr('ech.blocked_apps_hint'),
                 ),
-                if (ech.perAppEnabled) ...[
-                  const SizedBox(height: 4),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      // TODO: app picker - reuse blocked-app selection from v2ray settings
-                    },
-                    icon: const Icon(Icons.apps),
-                    label: Text(
-                      '${t.tr('ech.select_apps')} (${ech.selectedApps.length})',
-                    ),
-                  ),
-                ],
               ],
             ),
             const SizedBox(height: 24),

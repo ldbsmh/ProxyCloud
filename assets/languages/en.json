@@ -578,12 +578,10 @@
         "pubkey_domain": "ECH public key query domain",
         "vpn_takeover": "Global VPN takeover",
         "vpn_takeover_sub": "Off = local proxy mode only",
-        "per_app": "Per-app proxy",
-        "per_app_sub": "Route selected apps through the tunnel",
-        "select_apps": "Select Apps",
         "settings_server": "Server Settings",
         "settings_doh": "DoH & Public Key",
         "settings_local": "Local & Mode",
-        "settings_mode": "Per-App Mode"
+        "settings_mode": "Per-App Mode",
+        "blocked_apps_hint": "Per-app proxy: pick apps that bypass the tunnel in Tools → Blocked Apps"
     }
 }
